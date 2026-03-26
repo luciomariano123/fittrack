@@ -11,6 +11,7 @@ import {
   Trash2,
   X,
   Download,
+  FileText,
 } from "lucide-react";
 import { getDayName } from "@/lib/utils";
 
@@ -203,6 +204,60 @@ export default function RutinasPage() {
     }
   }
 
+  function handleExportPDF() {
+    const byDay = new Map<string, Exercise[]>();
+    DAYS.forEach(d => byDay.set(d, []));
+    exercises.forEach(ex => {
+      const arr = byDay.get(ex.dayOfWeek) || [];
+      arr.push(ex);
+      byDay.set(ex.dayOfWeek, arr);
+    });
+
+    const rows = DAYS.map(day => {
+      const exs = byDay.get(day) || [];
+      if (exs.length === 0) return `<tr><td style="padding:6px 8px;font-weight:600;color:#555">${day}</td><td style="padding:6px 8px;color:#999" colspan="3">Descanso</td></tr>`;
+      return exs.map((ex, i) => `
+        <tr style="background:${i % 2 === 0 ? '#fafafa' : '#fff'}">
+          ${i === 0 ? `<td style="padding:6px 8px;font-weight:600;color:#333;vertical-align:top" rowspan="${exs.length}">${day}</td>` : ''}
+          <td style="padding:6px 8px;color:#1a1a18">${ex.name}</td>
+          <td style="padding:6px 8px;text-align:center;color:#555;font-family:monospace">${ex.sets}×${ex.reps}</td>
+          <td style="padding:6px 8px;text-align:center;color:#888;font-size:12px">${ex.muscleGroup}</td>
+        </tr>`).join('');
+    }).join('');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>Rutina FitTrack</title>
+    <style>
+      body { font-family: -apple-system, sans-serif; max-width: 700px; margin: 40px auto; color: #1a1a18; }
+      h1 { font-size: 22px; margin-bottom: 4px; }
+      .sub { color: #888; font-size: 13px; margin-bottom: 6px; }
+      .badge { display:inline-block; background:#EAF3DE; color:#3B6D11; border-radius:20px; padding:4px 12px; font-size:12px; font-weight:600; margin-bottom:20px; }
+      table { width:100%; border-collapse:collapse; font-size:14px; }
+      th { background:#1a1a18; color:#fff; padding:8px; text-align:left; font-weight:500; }
+      th:nth-child(2) { width:40%; }
+      th:nth-child(3),th:nth-child(4) { width:15%; text-align:center; }
+      td { border-bottom: 1px solid #eee; }
+      .footer { margin-top:24px; font-size:11px; color:#aaa; text-align:center; }
+      @media print { body { margin: 20px; } }
+    </style></head><body>
+    <h1>🏋️ Mi Rutina</h1>
+    <p class="sub">Generado desde FitTrack · ${new Date().toLocaleDateString('es-AR', { day:'numeric', month:'long', year:'numeric' })}</p>
+    <div class="badge">⏱ Cambiar rutina cada 8–12 semanas para seguir progresando</div>
+    <table>
+      <thead><tr><th>Día</th><th>Ejercicio</th><th>Series×Reps</th><th>Músculo</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p class="footer">FitTrack · entrenapp.up.railway.app</p>
+    </body></html>`;
+
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 300);
+  }
+
   async function handleDeleteExercise(id: number) {
     if (!confirm("¿Querés eliminar este ejercicio?")) return;
     const res = await fetch(`/api/exercises/${id}`, { method: "DELETE" });
@@ -237,6 +292,15 @@ export default function RutinasPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportPDF}
+            disabled={exercises.length === 0}
+            title="Exportar PDF"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-[8px] text-sm font-medium border border-[rgba(0,0,0,0.12)] text-[#6B6B65] hover:bg-[#F0EFE9] transition-colors disabled:opacity-50"
+          >
+            <FileText size={15} />
+            PDF
+          </button>
           <button
             onClick={handleLoadDefault}
             disabled={loadingDefault}
