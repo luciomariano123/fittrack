@@ -62,6 +62,8 @@ export default function NotificacionesPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [webhookLoading, setWebhookLoading] = useState(false);
+  const [webhookResult, setWebhookResult] = useState<{ success: boolean; message: string } | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -85,6 +87,28 @@ export default function NotificacionesPage() {
       });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSetupWebhook() {
+    setWebhookLoading(true);
+    setWebhookResult(null);
+    try {
+      const webhookUrl = `${window.location.origin}/api/webhook/telegram`;
+      const res = await fetch("/api/notifications/webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ webhookUrl }),
+      });
+      const data = await res.json();
+      setWebhookResult({
+        success: res.ok,
+        message: res.ok
+          ? "¡Webhook activado! Tu bot ya puede recibir mensajes."
+          : data.error || "Error al configurar el webhook",
+      });
+    } finally {
+      setWebhookLoading(false);
     }
   }
 
@@ -169,10 +193,11 @@ export default function NotificacionesPage() {
           </div>
 
           {/* Setup instructions */}
-          <div className="bg-[#F0EFE9] rounded-[8px] p-3 mb-4 text-xs text-[#6B6B65] space-y-1">
-            <p className="font-medium text-[#1A1A18]">Cómo configurar tu bot:</p>
-            <p>1. Buscá <span className="font-medium text-[#1A1A18]">@BotFather</span> en Telegram → enviá <span className="font-mono">/newbot</span> → copiá el token.</p>
-            <p>2. Mandá un mensaje a tu bot → buscá tu Chat ID en <span className="font-medium text-[#1A1A18]">@userinfobot</span>.</p>
+          <div className="bg-[#F0EFE9] rounded-[8px] p-3 mb-4 text-xs text-[#6B6B65] space-y-1.5">
+            <p className="font-medium text-[#1A1A18]">Cómo configurar tu bot (3 pasos):</p>
+            <p>1. Buscá <span className="font-medium text-[#1A1A18]">@BotFather</span> en Telegram → enviá <span className="font-mono bg-white px-1 rounded">/newbot</span> → seguí los pasos → copiá el token.</p>
+            <p>2. Abrí tu bot en Telegram y mandá cualquier mensaje. Luego buscá <span className="font-medium text-[#1A1A18]">@userinfobot</span> → te dice tu Chat ID.</p>
+            <p>3. Pegá ambos acá abajo y hacé click en <span className="font-medium text-[#1A1A18]">Activar webhook</span>.</p>
           </div>
 
           <div className="space-y-3">
@@ -210,6 +235,29 @@ export default function NotificacionesPage() {
               <p className="text-xs text-[#A0A09A] mt-1">
                 Tu ID de usuario de Telegram (conseguilo en @userinfobot)
               </p>
+            </div>
+
+            {/* Webhook setup */}
+            <div className="bg-[#F0EFE9] rounded-[8px] p-3">
+              <p className="text-xs font-medium text-[#1A1A18] mb-1">Paso 3 — Activar el bot</p>
+              <p className="text-xs text-[#6B6B65] mb-2">Registrá el webhook para que tu bot pueda recibir mensajes y responder comandos.</p>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleSetupWebhook}
+                  disabled={webhookLoading || !config.telegramBotToken}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-[8px] text-xs font-medium bg-[#1A1A18] text-white disabled:opacity-50 transition-colors"
+                >
+                  {webhookLoading ? <Loader2 size={13} className="animate-spin" /> : <SendIcon size={13} />}
+                  Activar webhook
+                </button>
+                {webhookResult && (
+                  <div className={`flex items-center gap-1.5 text-xs ${webhookResult.success ? "text-[#3B6D11]" : "text-[#A32D2D]"}`}>
+                    {webhookResult.success ? <CheckCircle size={13} /> : <XCircle size={13} />}
+                    {webhookResult.message}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Test button */}
