@@ -17,6 +17,23 @@ import type { NotifSchedule, NotificationConfig } from "@/app/api/notifications/
 
 const DAY_NAMES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
+function getCurrentTimeInZone(timezone: string): { time: string; dayName: string } {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("es-AR", {
+    timeZone: timezone,
+    hour: "2-digit",
+    minute: "2-digit",
+    weekday: "long",
+    hour12: false,
+  }).formatToParts(now);
+  const hour = parts.find(p => p.type === "hour")?.value ?? "00";
+  const minute = parts.find(p => p.type === "minute")?.value ?? "00";
+  const weekday = parts.find(p => p.type === "weekday")?.value ?? "";
+  // Normalize to title case to match DAY_NAMES (e.g. "miércoles" → "Miércoles")
+  const dayName = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+  return { time: `${hour}:${minute}`, dayName };
+}
+
 const DEFAULT_CONFIG: NotificationConfig = {
   preWorkout:        { enabled: true, time: "06:30", mode: "train",  customDays: [] },
   nutritionReminder: { enabled: true, time: "13:00", mode: "all",    customDays: [] },
@@ -128,10 +145,6 @@ async function runMissedSession(user: { id: number; name: string; telegramChatId
 
 // Run every minute — check which users have a notification due right now
 cron.schedule("* * * * *", async () => {
-  const now = new Date();
-  const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  const todayName = DAY_NAMES[now.getDay()];
-
   try {
     const users = await prisma.user.findMany({
       where: {
@@ -147,6 +160,9 @@ cron.schedule("* * * * *", async () => {
     })[];
 
     for (const user of activeUsers) {
+      const userTimezone = user.timezone || "America/Argentina/Buenos_Aires";
+      const { time: currentTime, dayName: todayName } = getCurrentTimeInZone(userTimezone);
+
       const cfg = ((user.notificationConfig as unknown as NotificationConfig) || DEFAULT_CONFIG);
 
       const preWorkout = { ...DEFAULT_CONFIG.preWorkout, ...cfg.preWorkout };

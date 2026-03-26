@@ -5,6 +5,26 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { Loader2, Save, Target } from "lucide-react";
 import { calculateBMI, calculateSmartGoal, linearRegression } from "@/lib/calculations";
 
+const TIMEZONES = [
+  { value: "America/Argentina/Buenos_Aires", label: "Argentina (UTC-3)" },
+  { value: "America/Santiago", label: "Chile (UTC-4 / UTC-3 verano)" },
+  { value: "America/Bogota", label: "Colombia (UTC-5)" },
+  { value: "America/Lima", label: "Perú (UTC-5)" },
+  { value: "America/Mexico_City", label: "México - Ciudad de México (UTC-6)" },
+  { value: "America/Monterrey", label: "México - Monterrey (UTC-6)" },
+  { value: "America/Caracas", label: "Venezuela (UTC-4)" },
+  { value: "America/La_Paz", label: "Bolivia (UTC-4)" },
+  { value: "America/Asuncion", label: "Paraguay (UTC-4)" },
+  { value: "America/Montevideo", label: "Uruguay (UTC-3)" },
+  { value: "America/Guayaquil", label: "Ecuador (UTC-5)" },
+  { value: "America/Sao_Paulo", label: "Brasil - São Paulo (UTC-3)" },
+  { value: "America/New_York", label: "EE.UU. - New York (UTC-5)" },
+  { value: "America/Chicago", label: "EE.UU. - Chicago (UTC-6)" },
+  { value: "America/Los_Angeles", label: "EE.UU. - Los Angeles (UTC-8)" },
+  { value: "Europe/Madrid", label: "España (UTC+1)" },
+  { value: "UTC", label: "UTC (0)" },
+];
+
 interface UserProfile {
   name: string;
   email: string;
@@ -14,6 +34,7 @@ interface UserProfile {
   trainDays: string;
   trainTime: string;
   sex: string;
+  timezone: string;
 }
 
 interface WeightLog {
@@ -144,6 +165,19 @@ export default function ConfiguracionPage() {
             <div>
               <label className="text-xs font-medium text-[#6B6B65] block mb-1.5">Email</label>
               <input value={profile.email} disabled className="w-full h-9 rounded-[8px] border border-[rgba(0,0,0,0.08)] bg-[#F0EFE9] px-3 text-sm text-[#A0A09A]" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-[#6B6B65] block mb-1.5">Zona horaria</label>
+              <select
+                value={profile.timezone || "America/Argentina/Buenos_Aires"}
+                onChange={e => setProfile(p => p ? { ...p, timezone: e.target.value } : p)}
+                className="w-full h-9 rounded-[8px] border border-[rgba(0,0,0,0.12)] bg-white px-3 text-sm focus:outline-none focus:border-[#1A1A18]"
+              >
+                {TIMEZONES.map(tz => (
+                  <option key={tz.value} value={tz.value}>{tz.label}</option>
+                ))}
+              </select>
+              <p className="text-[10px] text-[#A0A09A] mt-1">Las notificaciones de Telegram se enviarán en este horario</p>
             </div>
           </div>
         </div>

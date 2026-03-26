@@ -25,6 +25,7 @@ export async function GET() {
         trainTime: true,
         birthDate: true,
         sex: true,
+        timezone: true,
       },
     });
 
@@ -46,6 +47,7 @@ const updateSchema = z.object({
   activityLevel: z.string().optional(),
   trainDays: z.string().optional(),
   trainTime: z.string().optional(),
+  timezone: z.string().optional(),
 });
 
 export async function PUT(req: NextRequest) {

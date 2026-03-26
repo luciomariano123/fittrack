@@ -22,6 +22,7 @@ model User {
   telegramBotToken    String?
   telegramChatId      String?
   notificationConfig  Json?
+  timezone            String   @default("America/Argentina/Buenos_Aires")
   onboardingDone      Boolean  @default(false)
   createdAt         DateTime @default(now())
   weightLogs        WeightLog[]
