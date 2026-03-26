@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import {
   CheckCircle2,
-  Circle,
   ChevronDown,
   ChevronUp,
   Plus,
   Loader2,
   Trash2,
+  X,
 } from "lucide-react";
 import { getDayName } from "@/lib/utils";
 
@@ -30,9 +30,19 @@ interface Session {
   routineName: string;
   completed: boolean;
   completedAt: string | null;
+  mood?: string | null;
+  notes?: string | null;
+  duration?: number | null;
 }
 
 const DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+
+const MOODS = [
+  { value: "great", emoji: "💪", label: "Excelente" },
+  { value: "good", emoji: "😊", label: "Bien" },
+  { value: "tired", emoji: "😐", label: "Cansado" },
+  { value: "bad", emoji: "😞", label: "Mal" },
+];
 
 export default function RutinasPage() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -51,6 +61,18 @@ export default function RutinasPage() {
     dayOfWeek: getDayName(new Date()),
   });
 
+  // Session notes modal state
+  const [moodModal, setMoodModal] = useState<{
+    sessionId: number;
+    visible: boolean;
+  } | null>(null);
+  const [moodForm, setMoodForm] = useState({
+    mood: "",
+    notes: "",
+    duration: "60",
+  });
+  const [savingMood, setSavingMood] = useState(false);
+
   const today = getDayName(new Date());
 
   useEffect(() => {
@@ -65,22 +87,43 @@ export default function RutinasPage() {
   }, []);
 
   async function handleCompleteSession(sessionId: number) {
-    setCompletingId(sessionId);
+    // Show mood modal instead of completing immediately
+    setMoodForm({ mood: "", notes: "", duration: "60" });
+    setMoodModal({ sessionId, visible: true });
+  }
+
+  async function handleSaveMood() {
+    if (!moodModal) return;
+    setSavingMood(true);
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/complete`, {
+      const res = await fetch(`/api/sessions/${moodModal.sessionId}/complete`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mood: moodForm.mood || undefined,
+          notes: moodForm.notes || undefined,
+          duration: moodForm.duration ? parseInt(moodForm.duration) : undefined,
+        }),
       });
       if (res.ok) {
         setSessions((prev) =>
           prev.map((s) =>
-            s.id === sessionId
-              ? { ...s, completed: true, completedAt: new Date().toISOString() }
+            s.id === moodModal.sessionId
+              ? {
+                  ...s,
+                  completed: true,
+                  completedAt: new Date().toISOString(),
+                  mood: moodForm.mood || null,
+                  notes: moodForm.notes || null,
+                  duration: moodForm.duration ? parseInt(moodForm.duration) : null,
+                }
               : s
           )
         );
+        setMoodModal(null);
       }
     } finally {
-      setCompletingId(null);
+      setSavingMood(false);
     }
   }
 
@@ -371,15 +414,26 @@ export default function RutinasPage() {
                   {isToday && (
                     <div className="pt-3 border-t border-[rgba(0,0,0,0.06)]">
                       {todaySession?.completed ? (
-                        <div className="flex items-center gap-2 text-sm text-[#3B6D11]">
-                          <CheckCircle2 size={16} />
-                          <span>Sesión completada</span>
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2 text-sm text-[#3B6D11]">
+                            <CheckCircle2 size={16} />
+                            <span>Sesión completada</span>
+                            {todaySession.mood && (
+                              <span className="ml-1">
+                                {MOODS.find((m) => m.value === todaySession.mood)?.emoji}
+                              </span>
+                            )}
+                          </div>
+                          {todaySession.notes && (
+                            <p className="text-xs text-[#6B6B65] pl-6">
+                              {todaySession.notes}
+                            </p>
+                          )}
                         </div>
                       ) : (
                         <button
                           onClick={() =>
-                            todaySession &&
-                            handleCompleteSession(todaySession.id)
+                            todaySession && handleCompleteSession(todaySession.id)
                           }
                           disabled={!todaySession || completingId === todaySession?.id}
                           className="flex items-center gap-2 px-4 py-2 rounded-[8px] text-sm font-medium bg-[#3B6D11] text-white hover:bg-[#3B6D11]/85 transition-colors disabled:opacity-50"
@@ -400,6 +454,103 @@ export default function RutinasPage() {
           );
         })}
       </div>
+
+      {/* Mood / Notes Modal */}
+      {moodModal?.visible && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-[14px] border border-[rgba(0,0,0,0.08)] w-full max-w-md p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-medium text-[#1A1A18]">
+                ¿Cómo te sentiste hoy?
+              </h3>
+              <button
+                onClick={() => setMoodModal(null)}
+                className="p-1.5 rounded-[6px] hover:bg-[#F0EFE9] text-[#A0A09A] transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Mood selector */}
+            <div className="grid grid-cols-4 gap-2 mb-4">
+              {MOODS.map((m) => (
+                <button
+                  key={m.value}
+                  type="button"
+                  onClick={() => setMoodForm((p) => ({ ...p, mood: m.value }))}
+                  className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-[10px] border transition-colors ${
+                    moodForm.mood === m.value
+                      ? "bg-[#1A1A18] border-[#1A1A18]"
+                      : "bg-white border-[rgba(0,0,0,0.12)] hover:bg-[#F0EFE9]"
+                  }`}
+                >
+                  <span className="text-2xl">{m.emoji}</span>
+                  <span
+                    className={`text-xs font-medium ${
+                      moodForm.mood === m.value ? "text-white" : "text-[#6B6B65]"
+                    }`}
+                  >
+                    {m.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Notes */}
+            <div className="mb-4">
+              <label className="text-xs font-medium text-[#6B6B65] block mb-1.5">
+                Notas opcionales
+              </label>
+              <textarea
+                value={moodForm.notes}
+                onChange={(e) => setMoodForm((p) => ({ ...p, notes: e.target.value }))}
+                placeholder="Notas opcionales: subí peso en sentadillas, me dolió el hombro..."
+                rows={3}
+                className="w-full rounded-[8px] border border-[rgba(0,0,0,0.12)] bg-white px-3 py-2 text-sm text-[#1A1A18] placeholder:text-[#A0A09A] focus:outline-none focus:border-[#1A1A18] resize-none"
+              />
+            </div>
+
+            {/* Duration */}
+            <div className="mb-6">
+              <label className="text-xs font-medium text-[#6B6B65] block mb-1.5">
+                ¿Cuánto duró tu sesión? (minutos)
+              </label>
+              <input
+                type="number"
+                value={moodForm.duration}
+                onChange={(e) => setMoodForm((p) => ({ ...p, duration: e.target.value }))}
+                min={5}
+                max={300}
+                className="w-full h-9 rounded-[8px] border border-[rgba(0,0,0,0.12)] bg-white px-3 text-sm text-[#1A1A18] focus:outline-none focus:border-[#1A1A18]"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setMoodModal(null)}
+                className="flex-1 px-4 py-2.5 rounded-[8px] text-sm font-medium text-[#6B6B65] border border-[rgba(0,0,0,0.12)] hover:bg-[#F0EFE9] transition-colors"
+              >
+                Omitir
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveMood}
+                disabled={savingMood}
+                className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-[8px] text-sm font-medium bg-[#3B6D11] text-white hover:bg-[#3B6D11]/85 transition-colors disabled:opacity-50"
+              >
+                {savingMood ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <CheckCircle2 size={14} />
+                )}
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </MainLayout>
   );
 }

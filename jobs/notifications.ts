@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import { prisma } from "@/lib/prisma";
-import { sendWhatsAppMessage } from "@/lib/capso";
+import { sendTelegramMessage, createInlineKeyboard } from "@/lib/telegram";
 import {
   preWorkoutMessage,
   nutritionReminderMessage,
@@ -28,47 +28,37 @@ function getTodayName(): string {
   return DAY_NAMES[new Date().getDay()];
 }
 
-async function getUsersForToday(): Promise<
-  {
-    id: number;
-    name: string;
-    whatsappNumber: string;
-    capsoApiKey: string;
-    trainDays: string;
-    trainTime: string;
-    activityLevel: string;
-    weightGoalKg: number;
-    heightCm: number;
-    sex: string;
-    birthDate: Date;
-  }[]
-> {
+async function getUsersForToday() {
   const todayName = getTodayName();
 
   const users = await prisma.user.findMany({
     where: {
-      whatsappNumber: { not: null },
-      capsoApiKey: { not: null },
+      telegramChatId: { not: null },
+      telegramBotToken: { not: null },
       onboardingDone: true,
       trainDays: { contains: todayName },
     },
   });
 
-  return users.filter(
-    (u) => u.whatsappNumber && u.capsoApiKey
-  ) as any[];
+  return users.filter((u) => u.telegramChatId && u.telegramBotToken) as (typeof users[0] & {
+    telegramChatId: string;
+    telegramBotToken: string;
+  })[];
 }
 
 async function getAllActiveUsers() {
   const users = await prisma.user.findMany({
     where: {
-      whatsappNumber: { not: null },
-      capsoApiKey: { not: null },
+      telegramChatId: { not: null },
+      telegramBotToken: { not: null },
       onboardingDone: true,
     },
   });
 
-  return users.filter((u) => u.whatsappNumber && u.capsoApiKey) as any[];
+  return users.filter((u) => u.telegramChatId && u.telegramBotToken) as (typeof users[0] & {
+    telegramChatId: string;
+    telegramBotToken: string;
+  })[];
 }
 
 async function logNotification(
@@ -82,7 +72,7 @@ async function logNotification(
   });
 }
 
-// 6:30 AM on gym days: pre-workout message
+// 6:30 AM on gym days: pre-workout message with inline keyboard
 cron.schedule("30 6 * * *", async () => {
   console.log("[CRON] Running pre-workout notifications...");
   try {
@@ -108,17 +98,23 @@ cron.schedule("30 6 * * *", async () => {
         time: user.trainTime === "morning" ? "la mañana" : "la noche",
       });
 
-      const result = await sendWhatsAppMessage(
-        user.whatsappNumber,
+      const keyboard = createInlineKeyboard([
+        [{ text: "✅ Marcar como completado", callback_data: "complete_session" }],
+        [{ text: "📊 Ver estado", callback_data: "get_status" }],
+      ]);
+
+      const result = await sendTelegramMessage(
+        user.telegramChatId,
         message,
-        user.capsoApiKey
+        user.telegramBotToken,
+        keyboard
       );
 
       await logNotification(
         user.id,
         "pre_workout",
         message,
-        result.success ? "sent" : "error"
+        result.ok ? "sent" : "error"
       );
     }
   } catch (error) {
@@ -146,17 +142,17 @@ cron.schedule("0 8 * * *", async () => {
           : undefined,
       });
 
-      const result = await sendWhatsAppMessage(
-        user.whatsappNumber,
+      const result = await sendTelegramMessage(
+        user.telegramChatId,
         message,
-        user.capsoApiKey
+        user.telegramBotToken
       );
 
       await logNotification(
         user.id,
         "weight_reminder",
         message,
-        result.success ? "sent" : "error"
+        result.ok ? "sent" : "error"
       );
     }
   } catch (error) {
@@ -210,17 +206,17 @@ cron.schedule("0 13 * * *", async () => {
         consumedCalories: Math.round(consumedCalories),
       });
 
-      const result = await sendWhatsAppMessage(
-        user.whatsappNumber,
+      const result = await sendTelegramMessage(
+        user.telegramChatId,
         message,
-        user.capsoApiKey
+        user.telegramBotToken
       );
 
       await logNotification(
         user.id,
         "nutrition_reminder",
         message,
-        result.success ? "sent" : "error"
+        result.ok ? "sent" : "error"
       );
     }
   } catch (error) {
@@ -255,17 +251,17 @@ cron.schedule("0 20 * * *", async () => {
         routineName: todaySession.routineName,
       });
 
-      const result = await sendWhatsAppMessage(
-        user.whatsappNumber,
+      const result = await sendTelegramMessage(
+        user.telegramChatId,
         message,
-        user.capsoApiKey
+        user.telegramBotToken
       );
 
       await logNotification(
         user.id,
         "missed_session",
         message,
-        result.success ? "sent" : "error"
+        result.ok ? "sent" : "error"
       );
     }
   } catch (error) {

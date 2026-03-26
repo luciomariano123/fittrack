@@ -5,8 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
 const configSchema = z.object({
-  whatsappNumber: z.string().optional(),
-  capsoApiKey: z.string().optional(),
+  telegramBotToken: z.string().optional(),
+  telegramChatId: z.string().optional(),
   preWorkout: z.boolean().optional(),
   nutritionReminder: z.boolean().optional(),
   weightReminder: z.boolean().optional(),
@@ -25,17 +25,15 @@ export async function GET() {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
-        whatsappNumber: true,
-        capsoApiKey: true,
+        telegramBotToken: true,
+        telegramChatId: true,
       },
     });
 
-    // For now, notification toggles are stored as user preferences
-    // In production these could be a separate NotificationSettings table
     return NextResponse.json({
       config: {
-        whatsappNumber: user?.whatsappNumber || "",
-        capsoApiKey: user?.capsoApiKey || "",
+        telegramBotToken: user?.telegramBotToken || "",
+        telegramChatId: user?.telegramChatId || "",
         preWorkout: true,
         nutritionReminder: true,
         weightReminder: true,
@@ -67,8 +65,8 @@ export async function PUT(req: NextRequest) {
     await prisma.user.update({
       where: { id: userId },
       data: {
-        whatsappNumber: parsed.data.whatsappNumber,
-        capsoApiKey: parsed.data.capsoApiKey,
+        telegramBotToken: parsed.data.telegramBotToken || null,
+        telegramChatId: parsed.data.telegramChatId || null,
       },
     });
 

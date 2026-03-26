@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { sendWhatsAppMessage } from "@/lib/capso";
+import { sendTelegramMessage } from "@/lib/telegram";
 import { postWorkoutMessage } from "@/lib/message-templates";
 
 export async function POST(
@@ -19,6 +19,20 @@ export async function POST(
     const userId = parseInt(session.user.id);
     const sessionId = parseInt(id);
 
+    // Parse optional body fields
+    let mood: string | undefined;
+    let notes: string | undefined;
+    let duration: number | undefined;
+
+    try {
+      const body = await req.json();
+      mood = body.mood;
+      notes = body.notes;
+      duration = body.duration ? parseInt(body.duration) : undefined;
+    } catch {
+      // Body is optional — ignore parse errors
+    }
+
     const trainingSession = await prisma.trainingSession.findFirst({
       where: { id: sessionId, userId },
     });
@@ -31,21 +45,26 @@ export async function POST(
 
     await prisma.trainingSession.update({
       where: { id: sessionId },
-      data: { completed: true, completedAt },
+      data: {
+        completed: true,
+        completedAt,
+        mood: mood || null,
+        notes: notes || null,
+        duration: duration || null,
+      },
     });
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
         name: true,
-        whatsappNumber: true,
-        capsoApiKey: true,
+        telegramBotToken: true,
+        telegramChatId: true,
       },
     });
 
-    if (user?.whatsappNumber && user?.capsoApiKey) {
-      const durationMs = completedAt.getTime() - new Date(trainingSession.date).getTime();
-      const durationMin = Math.round(durationMs / 60000) || 60;
+    if (user?.telegramBotToken && user?.telegramChatId) {
+      const durationMin = duration || Math.round((completedAt.getTime() - new Date(trainingSession.date).getTime()) / 60000) || 60;
 
       const message = postWorkoutMessage({
         name: user.name.split(" ")[0],
@@ -53,10 +72,10 @@ export async function POST(
         duration: durationMin,
       });
 
-      const result = await sendWhatsAppMessage(
-        user.whatsappNumber,
+      const result = await sendTelegramMessage(
+        user.telegramChatId,
         message,
-        user.capsoApiKey
+        user.telegramBotToken
       );
 
       await prisma.notificationLog.create({
@@ -64,7 +83,7 @@ export async function POST(
           userId,
           type: "post_workout",
           message,
-          status: result.success ? "sent" : "error",
+          status: result.ok ? "sent" : "error",
         },
       });
     }

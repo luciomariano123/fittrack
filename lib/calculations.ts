@@ -73,6 +73,21 @@ export function calculateGoalDate(daysToGoal: number): Date {
   return date;
 }
 
+export function calculateSmartGoal(weightKg: number, heightCm: number, sex: string): number {
+  // Target IMC of 22 (middle of normal range 18.5-24.9)
+  const heightM = heightCm / 100;
+
+  // If already in healthy range, target IMC 21
+  const currentBMI = weightKg / (heightM * heightM);
+  const targetBMI = currentBMI >= 18.5 && currentBMI <= 24.9 ? 21 : 22;
+
+  const targetWeight = targetBMI * heightM * heightM;
+
+  // Don't suggest losing more than 20% of body weight at once
+  const minWeight = weightKg * 0.8;
+  return Math.round(Math.max(targetWeight, minWeight) * 10) / 10;
+}
+
 export function calculateAge(birthDate: Date): number {
   const today = new Date();
   let age = today.getFullYear() - birthDate.getFullYear();

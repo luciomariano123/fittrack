@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { MainLayout } from "@/components/layout/main-layout";
 import {
   LineChart,
@@ -28,7 +29,9 @@ interface WeightPageData {
   projections: { date: string; projected: number }[];
 }
 
-export default function PesoPage() {
+function PesoPageInner() {
+  const searchParams = useSearchParams();
+  const weightInputRef = useRef<HTMLInputElement>(null);
   const [data, setData] = useState<WeightPageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [newWeight, setNewWeight] = useState("");
@@ -45,6 +48,14 @@ export default function PesoPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Auto-focus weight input when ?accion=registrar is in URL
+  useEffect(() => {
+    if (!loading && searchParams.get("accion") === "registrar") {
+      weightInputRef.current?.focus();
+      weightInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [loading, searchParams]);
 
   async function handleAddWeight(e: React.FormEvent) {
     e.preventDefault();
@@ -260,6 +271,7 @@ export default function PesoPage() {
         )}
         <form onSubmit={handleAddWeight} className="flex gap-2">
           <input
+            ref={weightInputRef}
             type="number"
             step="0.1"
             value={newWeight}
@@ -328,5 +340,19 @@ export default function PesoPage() {
         )}
       </div>
     </MainLayout>
+  );
+}
+
+export default function PesoPage() {
+  return (
+    <Suspense fallback={
+      <MainLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="w-6 h-6 border-2 border-[#1A1A18] border-t-transparent rounded-full animate-spin" />
+        </div>
+      </MainLayout>
+    }>
+      <PesoPageInner />
+    </Suspense>
   );
 }

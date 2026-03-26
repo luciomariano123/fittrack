@@ -8,26 +8,26 @@ datasource db {
 }
 
 model User {
-  id              Int      @id @default(autoincrement())
-  name            String
-  email           String   @unique
-  passwordHash    String
-  birthDate       DateTime
-  sex             String
-  heightCm        Float
-  weightGoalKg    Float
-  activityLevel   String
-  trainDays       String
-  trainTime       String
-  whatsappNumber  String?
-  capsoApiKey     String?
-  onboardingDone  Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  weightLogs      WeightLog[]
-  sessions        TrainingSession[]
-  foodLogs        FoodLog[]
-  notifications   NotificationLog[]
-  exercises       Exercise[]
+  id                Int      @id @default(autoincrement())
+  name              String
+  email             String   @unique
+  passwordHash      String
+  birthDate         DateTime
+  sex               String
+  heightCm          Float
+  weightGoalKg      Float
+  activityLevel     String
+  trainDays         String
+  trainTime         String
+  telegramBotToken  String?
+  telegramChatId    String?
+  onboardingDone    Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  weightLogs        WeightLog[]
+  sessions          TrainingSession[]
+  foodLogs          FoodLog[]
+  notifications     NotificationLog[]
+  exercises         Exercise[]
 }
 
 model WeightLog {
@@ -58,6 +58,9 @@ model TrainingSession {
   routineName String
   completed   Boolean  @default(false)
   completedAt DateTime?
+  notes       String?
+  mood        String?
+  duration    Int?
   user        User     @relation(fields: [userId], references: [id])
 }
 

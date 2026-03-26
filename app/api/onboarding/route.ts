@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
 const onboardingSchema = z.object({
+  name: z.string().min(1).optional(),
   birthDate: z.string(),
   sex: z.enum(["male", "female"]),
   heightCm: z.number().min(100).max(250),
@@ -13,7 +14,6 @@ const onboardingSchema = z.object({
   activityLevel: z.string(),
   trainDays: z.string(),
   trainTime: z.string(),
-  whatsappNumber: z.string().optional(),
 });
 
 const DEFAULT_EXERCISES = [
@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
     }
 
     const {
+      name,
       birthDate,
       sex,
       heightCm,
@@ -83,25 +84,29 @@ export async function POST(req: NextRequest) {
       activityLevel,
       trainDays,
       trainTime,
-      whatsappNumber,
     } = parsed.data;
 
     const userId = parseInt(session.user.id);
 
     // Update user profile
+    const updateData: Record<string, unknown> = {
+      birthDate: new Date(birthDate),
+      sex,
+      heightCm,
+      weightGoalKg,
+      activityLevel,
+      trainDays,
+      trainTime,
+      onboardingDone: true,
+    };
+
+    if (name) {
+      updateData.name = name;
+    }
+
     await prisma.user.update({
       where: { id: userId },
-      data: {
-        birthDate: new Date(birthDate),
-        sex,
-        heightCm,
-        weightGoalKg,
-        activityLevel,
-        trainDays,
-        trainTime,
-        whatsappNumber: whatsappNumber || null,
-        onboardingDone: true,
-      },
+      data: updateData,
     });
 
     // Save initial weight log

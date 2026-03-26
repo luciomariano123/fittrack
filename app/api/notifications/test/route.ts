@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { sendWhatsAppMessage } from "@/lib/capso";
+import { sendTelegramMessage } from "@/lib/telegram";
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,24 +17,24 @@ export async function POST(req: NextRequest) {
       where: { id: userId },
       select: {
         name: true,
-        whatsappNumber: true,
-        capsoApiKey: true,
+        telegramBotToken: true,
+        telegramChatId: true,
       },
     });
 
-    if (!user?.whatsappNumber || !user?.capsoApiKey) {
+    if (!user?.telegramBotToken || !user?.telegramChatId) {
       return NextResponse.json(
-        { error: "Configurá tu número de WhatsApp y API key primero" },
+        { error: "Configurá tu Bot Token y Chat ID de Telegram primero" },
         { status: 400 }
       );
     }
 
     const message = `✅ *Mensaje de prueba — FitTrack*\n\n¡Hola ${user.name.split(" ")[0]}! Las notificaciones están configuradas correctamente. 💪`;
 
-    const result = await sendWhatsAppMessage(
-      user.whatsappNumber,
+    const result = await sendTelegramMessage(
+      user.telegramChatId,
       message,
-      user.capsoApiKey
+      user.telegramBotToken
     );
 
     await prisma.notificationLog.create({
@@ -42,13 +42,13 @@ export async function POST(req: NextRequest) {
         userId,
         type: "test",
         message,
-        status: result.success ? "sent" : "error",
+        status: result.ok ? "sent" : "error",
       },
     });
 
-    if (!result.success) {
+    if (!result.ok) {
       return NextResponse.json(
-        { error: result.error || "Error al enviar el mensaje" },
+        { error: result.error || "Error al enviar el mensaje de Telegram" },
         { status: 500 }
       );
     }

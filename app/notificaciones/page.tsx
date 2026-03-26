@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
-import { Bell, MessageSquare, Loader2, Send, CheckCircle, XCircle } from "lucide-react";
+import { Bell, Send, Loader2, Send as SendIcon, CheckCircle, XCircle } from "lucide-react";
 
 interface NotifConfig {
-  whatsappNumber: string;
-  capsoApiKey: string;
+  telegramBotToken: string;
+  telegramChatId: string;
   preWorkout: boolean;
   nutritionReminder: boolean;
   weightReminder: boolean;
@@ -50,8 +50,8 @@ const NOTIFICATION_TYPES = [
 
 export default function NotificacionesPage() {
   const [config, setConfig] = useState<NotifConfig>({
-    whatsappNumber: "",
-    capsoApiKey: "",
+    telegramBotToken: "",
+    telegramChatId: "",
     preWorkout: true,
     nutritionReminder: true,
     weightReminder: true,
@@ -128,6 +128,8 @@ export default function NotificacionesPage() {
     test: "Prueba",
   };
 
+  const isConnected = !!(config.telegramBotToken && config.telegramChatId);
+
   if (loading) {
     return (
       <MainLayout>
@@ -143,52 +145,70 @@ export default function NotificacionesPage() {
       <div className="mb-6">
         <h1 className="text-xl font-medium text-[#1A1A18]">Notificaciones</h1>
         <p className="text-sm text-[#6B6B65] mt-0.5">
-          Configurá tus recordatorios por WhatsApp
+          Configurá tus recordatorios por Telegram
         </p>
       </div>
 
       {/* Config form */}
       <form onSubmit={handleSave} className="space-y-4 mb-6">
-        {/* WhatsApp config */}
+        {/* Telegram config */}
         <div className="bg-white rounded-[10px] border border-[rgba(0,0,0,0.08)] p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <MessageSquare size={16} className="text-[#6B6B65]" />
-            <p className="text-sm font-medium text-[#1A1A18]">
-              Configuración de WhatsApp
-            </p>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Send size={16} className="text-[#6B6B65]" />
+              <p className="text-sm font-medium text-[#1A1A18]">
+                Configuración de Telegram
+              </p>
+            </div>
+            {isConnected && (
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-[#3B6D11]" />
+                <span className="text-xs text-[#3B6D11] font-medium">Conectado</span>
+              </div>
+            )}
+          </div>
+
+          {/* Setup instructions */}
+          <div className="bg-[#F0EFE9] rounded-[8px] p-3 mb-4 text-xs text-[#6B6B65] space-y-1">
+            <p className="font-medium text-[#1A1A18]">Cómo configurar tu bot:</p>
+            <p>1. Buscá <span className="font-medium text-[#1A1A18]">@BotFather</span> en Telegram → enviá <span className="font-mono">/newbot</span> → copiá el token.</p>
+            <p>2. Mandá un mensaje a tu bot → buscá tu Chat ID en <span className="font-medium text-[#1A1A18]">@userinfobot</span>.</p>
           </div>
 
           <div className="space-y-3">
             <div>
               <label className="text-xs font-medium text-[#6B6B65] block mb-1.5">
-                Número de WhatsApp
+                Bot Token
               </label>
               <input
-                type="tel"
-                value={config.whatsappNumber}
+                type="password"
+                value={config.telegramBotToken}
                 onChange={(e) =>
-                  setConfig((p) => ({ ...p, whatsappNumber: e.target.value }))
+                  setConfig((p) => ({ ...p, telegramBotToken: e.target.value }))
                 }
-                placeholder="+54 9 11 1234-5678"
+                placeholder="123456789:ABCdefGHI..."
                 className="w-full h-9 rounded-[8px] border border-[rgba(0,0,0,0.12)] bg-white px-3 text-sm focus:outline-none focus:border-[#1A1A18]"
               />
+              <p className="text-xs text-[#A0A09A] mt-1">
+                El token que te da @BotFather al crear el bot
+              </p>
             </div>
 
             <div>
               <label className="text-xs font-medium text-[#6B6B65] block mb-1.5">
-                API Key de Capso
+                Chat ID
               </label>
               <input
-                type="password"
-                value={config.capsoApiKey}
+                type="text"
+                value={config.telegramChatId}
                 onChange={(e) =>
-                  setConfig((p) => ({ ...p, capsoApiKey: e.target.value }))
+                  setConfig((p) => ({ ...p, telegramChatId: e.target.value }))
                 }
-                placeholder="sk_..."
+                placeholder="123456789"
                 className="w-full h-9 rounded-[8px] border border-[rgba(0,0,0,0.12)] bg-white px-3 text-sm focus:outline-none focus:border-[#1A1A18]"
               />
               <p className="text-xs text-[#A0A09A] mt-1">
-                Conseguí tu API key en capso.com
+                Tu ID de usuario de Telegram (conseguilo en @userinfobot)
               </p>
             </div>
 
@@ -197,13 +217,13 @@ export default function NotificacionesPage() {
               <button
                 type="button"
                 onClick={handleTest}
-                disabled={testing || !config.whatsappNumber || !config.capsoApiKey}
+                disabled={testing || !config.telegramBotToken || !config.telegramChatId}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-[8px] text-xs font-medium border border-[rgba(0,0,0,0.12)] text-[#6B6B65] hover:bg-[#F0EFE9] transition-colors disabled:opacity-50"
               >
                 {testing ? (
                   <Loader2 size={13} className="animate-spin" />
                 ) : (
-                  <Send size={13} />
+                  <SendIcon size={13} />
                 )}
                 Enviar mensaje de prueba
               </button>
