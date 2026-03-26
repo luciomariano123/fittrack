@@ -10,6 +10,7 @@ import {
   Loader2,
   Trash2,
   X,
+  Download,
 } from "lucide-react";
 import { getDayName } from "@/lib/utils";
 
@@ -79,9 +80,27 @@ export default function RutinasPage() {
     Promise.all([
       fetch("/api/exercises").then((r) => r.json()),
       fetch("/api/sessions").then((r) => r.json()),
-    ]).then(([exData, sessData]) => {
-      setExercises(exData.exercises || []);
+    ]).then(async ([exData, sessData]) => {
+      const exs: Exercise[] = exData.exercises || [];
       setSessions(sessData.sessions || []);
+
+      if (exs.length === 0) {
+        // Auto-load suggested routine on first visit
+        const res = await fetch("/api/exercises/bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ replace: false }),
+        });
+        if (res.ok) {
+          const fresh = await fetch("/api/exercises").then((r) => r.json());
+          setExercises(fresh.exercises || []);
+        } else {
+          setExercises(exs);
+        }
+      } else {
+        setExercises(exs);
+      }
+
       setLoading(false);
     });
   }, []);
@@ -158,6 +177,32 @@ export default function RutinasPage() {
     }
   }
 
+  const [loadingDefault, setLoadingDefault] = useState(false);
+
+  async function handleLoadDefault() {
+    const hasExercises = exercises.length > 0;
+    const msg = hasExercises
+      ? "¿Reemplazar todos los ejercicios con la rutina sugerida? Se van a borrar los actuales."
+      : "¿Cargar la rutina sugerida?";
+    if (!confirm(msg)) return;
+    setLoadingDefault(true);
+    try {
+      const res = await fetch("/api/exercises/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ replace: true }),
+      });
+      if (res.ok) {
+        const [exData] = await Promise.all([
+          fetch("/api/exercises").then((r) => r.json()),
+        ]);
+        setExercises(exData.exercises || []);
+      }
+    } finally {
+      setLoadingDefault(false);
+    }
+  }
+
   async function handleDeleteExercise(id: number) {
     if (!confirm("¿Querés eliminar este ejercicio?")) return;
     const res = await fetch(`/api/exercises/${id}`, { method: "DELETE" });
@@ -191,13 +236,24 @@ export default function RutinasPage() {
             Tu plan de entrenamiento semanal
           </p>
         </div>
-        <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-[8px] text-sm font-medium bg-[#1A1A18] text-white hover:bg-[#1A1A18]/85 transition-colors"
-        >
-          <Plus size={15} />
-          Agregar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleLoadDefault}
+            disabled={loadingDefault}
+            title="Cargar rutina sugerida"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-[8px] text-sm font-medium border border-[rgba(0,0,0,0.12)] text-[#6B6B65] hover:bg-[#F0EFE9] transition-colors disabled:opacity-50"
+          >
+            {loadingDefault ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+            Rutina sugerida
+          </button>
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-[8px] text-sm font-medium bg-[#1A1A18] text-white hover:bg-[#1A1A18]/85 transition-colors"
+          >
+            <Plus size={15} />
+            Agregar
+          </button>
+        </div>
       </div>
 
       {/* Add exercise form */}
