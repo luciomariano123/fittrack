@@ -19,9 +19,10 @@ model User {
   activityLevel     String
   trainDays         String
   trainTime         String
-  telegramBotToken  String?
-  telegramChatId    String?
-  onboardingDone    Boolean  @default(false)
+  telegramBotToken    String?
+  telegramChatId      String?
+  notificationConfig  Json?
+  onboardingDone      Boolean  @default(false)
   createdAt         DateTime @default(now())
   weightLogs        WeightLog[]
   sessions          TrainingSession[]

@@ -2,15 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
-import { Bell, Send, Loader2, Send as SendIcon, CheckCircle, XCircle } from "lucide-react";
+import { Bell, Send, Loader2, Send as SendIcon, CheckCircle, XCircle, Clock, ChevronDown, ChevronUp } from "lucide-react";
+
+interface NotifSchedule {
+  enabled: boolean;
+  time: string;
+  mode: "train" | "all" | "custom";
+  customDays: string[];
+}
 
 interface NotifConfig {
   telegramBotToken: string;
   telegramChatId: string;
-  preWorkout: boolean;
-  nutritionReminder: boolean;
-  weightReminder: boolean;
-  missedSession: boolean;
+  preWorkout: NotifSchedule;
+  nutritionReminder: NotifSchedule;
+  weightReminder: NotifSchedule;
+  missedSession: NotifSchedule;
 }
 
 interface NotifLog {
@@ -21,45 +28,171 @@ interface NotifLog {
   status: string;
 }
 
+const DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+const DAYS_SHORT = ["L", "Ma", "Mi", "J", "V", "S", "D"];
+
+const DEFAULT_SCHEDULE: NotifSchedule = { enabled: true, time: "08:00", mode: "all", customDays: [] };
+
 const NOTIFICATION_TYPES = [
   {
-    key: "preWorkout",
+    key: "preWorkout" as keyof Omit<NotifConfig, "telegramBotToken" | "telegramChatId">,
     label: "Pre-entrenamiento",
     desc: "Recordatorio antes de ir al gym",
-    time: "6:30 AM los días de entrenamiento",
+    defaultTime: "06:30",
+    defaultMode: "train" as const,
   },
   {
-    key: "nutritionReminder",
+    key: "nutritionReminder" as keyof Omit<NotifConfig, "telegramBotToken" | "telegramChatId">,
     label: "Recordatorio nutricional",
     desc: "Para registrar tus comidas",
-    time: "13:00 todos los días",
+    defaultTime: "13:00",
+    defaultMode: "all" as const,
   },
   {
-    key: "weightReminder",
+    key: "weightReminder" as keyof Omit<NotifConfig, "telegramBotToken" | "telegramChatId">,
     label: "Registro de peso",
     desc: "Para que no te olvides de pesarte",
-    time: "8:00 AM todos los días",
+    defaultTime: "08:00",
+    defaultMode: "all" as const,
   },
   {
-    key: "missedSession",
+    key: "missedSession" as keyof Omit<NotifConfig, "telegramBotToken" | "telegramChatId">,
     label: "Sesión perdida",
     desc: "Si no completaste el entrenamiento",
-    time: "20:00 los días de entrenamiento",
+    defaultTime: "20:00",
+    defaultMode: "train" as const,
   },
 ];
 
+const DEFAULT_CONFIG: NotifConfig = {
+  telegramBotToken: "",
+  telegramChatId: "",
+  preWorkout:        { enabled: true, time: "06:30", mode: "train",  customDays: [] },
+  nutritionReminder: { enabled: true, time: "13:00", mode: "all",    customDays: [] },
+  weightReminder:    { enabled: true, time: "08:00", mode: "all",    customDays: [] },
+  missedSession:     { enabled: true, time: "20:00", mode: "train",  customDays: [] },
+};
+
+function modeLabel(mode: string) {
+  if (mode === "train") return "días de entreno";
+  if (mode === "all") return "todos los días";
+  return "días personalizados";
+}
+
+function NotifCard({ notif, schedule, onChange }: {
+  notif: typeof NOTIFICATION_TYPES[0];
+  schedule: NotifSchedule;
+  onChange: (s: NotifSchedule) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  const s = { ...DEFAULT_SCHEDULE, ...schedule };
+
+  function toggleDay(day: string) {
+    const days = s.customDays.includes(day)
+      ? s.customDays.filter(d => d !== day)
+      : [...s.customDays, day];
+    onChange({ ...s, customDays: days });
+  }
+
+  return (
+    <div className="border border-[rgba(0,0,0,0.08)] rounded-[10px] overflow-hidden">
+      {/* Main row */}
+      <div className="flex items-center justify-between px-4 py-3 bg-white">
+        <div className="flex-1 pr-3">
+          <p className="text-sm font-medium text-[#1A1A18]">{notif.label}</p>
+          <p className="text-xs text-[#A0A09A]">{notif.desc}</p>
+          <p className="text-xs text-[#6B6B65] mt-0.5">
+            <Clock size={10} className="inline mr-0.5 mb-px" />
+            {s.time} · {modeLabel(s.mode)}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setExpanded(e => !e)}
+            className="text-[#A0A09A] hover:text-[#1A1A18] transition-colors"
+          >
+            {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+          </button>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              className="sr-only peer"
+              checked={s.enabled}
+              onChange={e => onChange({ ...s, enabled: e.target.checked })}
+            />
+            <div className="w-9 h-5 bg-[#E0DFD9] peer-checked:bg-[#1A1A18] rounded-full transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-transform peer-checked:after:translate-x-4" />
+          </label>
+        </div>
+      </div>
+
+      {/* Schedule config (expanded) */}
+      {expanded && (
+        <div className="border-t border-[rgba(0,0,0,0.06)] bg-[#FAFAF8] px-4 py-3 space-y-3">
+          {/* Time */}
+          <div>
+            <label className="text-xs font-medium text-[#6B6B65] block mb-1.5">Horario</label>
+            <input
+              type="time"
+              value={s.time}
+              onChange={e => onChange({ ...s, time: e.target.value })}
+              className="h-9 rounded-[8px] border border-[rgba(0,0,0,0.12)] bg-white px-3 text-sm focus:outline-none focus:border-[#1A1A18]"
+            />
+          </div>
+
+          {/* Day mode */}
+          <div>
+            <label className="text-xs font-medium text-[#6B6B65] block mb-1.5">Días</label>
+            <div className="flex gap-1.5 flex-wrap">
+              {(["train", "all", "custom"] as const).map(mode => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => onChange({ ...s, mode })}
+                  className={`px-2.5 py-1 rounded-[6px] text-xs font-medium border transition-colors ${
+                    s.mode === mode
+                      ? "bg-[#1A1A18] text-white border-[#1A1A18]"
+                      : "bg-white text-[#6B6B65] border-[rgba(0,0,0,0.12)] hover:bg-[#F0EFE9]"
+                  }`}
+                >
+                  {mode === "train" ? "Días de entreno" : mode === "all" ? "Todos los días" : "Personalizado"}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom day picker */}
+            {s.mode === "custom" && (
+              <div className="flex gap-1.5 mt-2">
+                {DAYS.map((day, i) => (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => toggleDay(day)}
+                    className={`w-7 h-7 rounded-full text-xs font-medium border transition-colors ${
+                      s.customDays.includes(day)
+                        ? "bg-[#1A1A18] text-white border-[#1A1A18]"
+                        : "bg-white text-[#6B6B65] border-[rgba(0,0,0,0.12)] hover:bg-[#F0EFE9]"
+                    }`}
+                  >
+                    {DAYS_SHORT[i]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function NotificacionesPage() {
-  const [config, setConfig] = useState<NotifConfig>({
-    telegramBotToken: "",
-    telegramChatId: "",
-    preWorkout: true,
-    nutritionReminder: true,
-    weightReminder: true,
-    missedSession: true,
-  });
+  const [config, setConfig] = useState<NotifConfig>(DEFAULT_CONFIG);
   const [history, setHistory] = useState<NotifLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [webhookLoading, setWebhookLoading] = useState(false);
@@ -70,7 +203,16 @@ export default function NotificacionesPage() {
       fetch("/api/notifications/config").then((r) => r.json()),
       fetch("/api/notifications/history").then((r) => r.json()),
     ]).then(([cfg, hist]) => {
-      if (cfg.config) setConfig(cfg.config);
+      if (cfg.config) {
+        setConfig({
+          ...DEFAULT_CONFIG,
+          ...cfg.config,
+          preWorkout:        { ...DEFAULT_CONFIG.preWorkout,        ...cfg.config.preWorkout },
+          nutritionReminder: { ...DEFAULT_CONFIG.nutritionReminder, ...cfg.config.nutritionReminder },
+          weightReminder:    { ...DEFAULT_CONFIG.weightReminder,    ...cfg.config.weightReminder },
+          missedSession:     { ...DEFAULT_CONFIG.missedSession,     ...cfg.config.missedSession },
+        });
+      }
       setHistory(hist.notifications || []);
       setLoading(false);
     });
@@ -85,6 +227,8 @@ export default function NotificacionesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(config),
       });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
     } finally {
       setSaving(false);
     }
@@ -125,7 +269,7 @@ export default function NotificacionesPage() {
       setTestResult({
         success: res.ok,
         message: res.ok
-          ? "¡Mensaje de prueba enviado correctamente!"
+          ? "¡Mensaje de prueba enviado!"
           : data.error || "Error al enviar el mensaje",
       });
     } finally {
@@ -134,12 +278,8 @@ export default function NotificacionesPage() {
   }
 
   function formatTime(isoString: string) {
-    const d = new Date(isoString);
-    return d.toLocaleDateString("es-AR", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
+    return new Date(isoString).toLocaleDateString("es-AR", {
+      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
     });
   }
 
@@ -148,7 +288,6 @@ export default function NotificacionesPage() {
     nutrition_reminder: "Nutricional",
     weight_reminder: "Peso",
     missed_session: "Sesión perdida",
-    post_workout: "Post-entrenamiento",
     test: "Prueba",
   };
 
@@ -173,16 +312,13 @@ export default function NotificacionesPage() {
         </p>
       </div>
 
-      {/* Config form */}
       <form onSubmit={handleSave} className="space-y-4 mb-6">
         {/* Telegram config */}
         <div className="bg-white rounded-[10px] border border-[rgba(0,0,0,0.08)] p-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Send size={16} className="text-[#6B6B65]" />
-              <p className="text-sm font-medium text-[#1A1A18]">
-                Configuración de Telegram
-              </p>
+              <p className="text-sm font-medium text-[#1A1A18]">Configuración de Telegram</p>
             </div>
             {isConnected && (
               <div className="flex items-center gap-1.5">
@@ -192,55 +328,40 @@ export default function NotificacionesPage() {
             )}
           </div>
 
-          {/* Setup instructions */}
           <div className="bg-[#F0EFE9] rounded-[8px] p-3 mb-4 text-xs text-[#6B6B65] space-y-1.5">
             <p className="font-medium text-[#1A1A18]">Cómo configurar tu bot (3 pasos):</p>
-            <p>1. Buscá <span className="font-medium text-[#1A1A18]">@BotFather</span> en Telegram → enviá <span className="font-mono bg-white px-1 rounded">/newbot</span> → seguí los pasos → copiá el token.</p>
-            <p>2. Abrí tu bot en Telegram y mandá cualquier mensaje. Luego buscá <span className="font-medium text-[#1A1A18]">@userinfobot</span> → te dice tu Chat ID.</p>
+            <p>1. Buscá <span className="font-medium text-[#1A1A18]">@BotFather</span> en Telegram → enviá <span className="font-mono bg-white px-1 rounded">/newbot</span> → copiá el token.</p>
+            <p>2. Abrí tu bot en Telegram y mandá cualquier mensaje. Buscá <span className="font-medium text-[#1A1A18]">@userinfobot</span> → te dice tu Chat ID.</p>
             <p>3. Pegá ambos acá abajo y hacé click en <span className="font-medium text-[#1A1A18]">Activar webhook</span>.</p>
           </div>
 
           <div className="space-y-3">
             <div>
-              <label className="text-xs font-medium text-[#6B6B65] block mb-1.5">
-                Bot Token
-              </label>
+              <label className="text-xs font-medium text-[#6B6B65] block mb-1.5">Bot Token</label>
               <input
                 type="password"
                 value={config.telegramBotToken}
-                onChange={(e) =>
-                  setConfig((p) => ({ ...p, telegramBotToken: e.target.value }))
-                }
+                onChange={(e) => setConfig((p) => ({ ...p, telegramBotToken: e.target.value }))}
                 placeholder="123456789:ABCdefGHI..."
                 className="w-full h-9 rounded-[8px] border border-[rgba(0,0,0,0.12)] bg-white px-3 text-sm focus:outline-none focus:border-[#1A1A18]"
               />
-              <p className="text-xs text-[#A0A09A] mt-1">
-                El token que te da @BotFather al crear el bot
-              </p>
             </div>
 
             <div>
-              <label className="text-xs font-medium text-[#6B6B65] block mb-1.5">
-                Chat ID
-              </label>
+              <label className="text-xs font-medium text-[#6B6B65] block mb-1.5">Chat ID</label>
               <input
                 type="text"
                 value={config.telegramChatId}
-                onChange={(e) =>
-                  setConfig((p) => ({ ...p, telegramChatId: e.target.value }))
-                }
+                onChange={(e) => setConfig((p) => ({ ...p, telegramChatId: e.target.value }))}
                 placeholder="123456789"
                 className="w-full h-9 rounded-[8px] border border-[rgba(0,0,0,0.12)] bg-white px-3 text-sm focus:outline-none focus:border-[#1A1A18]"
               />
-              <p className="text-xs text-[#A0A09A] mt-1">
-                Tu ID de usuario de Telegram (conseguilo en @userinfobot)
-              </p>
             </div>
 
-            {/* Webhook setup */}
+            {/* Webhook */}
             <div className="bg-[#F0EFE9] rounded-[8px] p-3">
               <p className="text-xs font-medium text-[#1A1A18] mb-1">Paso 3 — Activar el bot</p>
-              <p className="text-xs text-[#6B6B65] mb-2">Registrá el webhook para que tu bot pueda recibir mensajes y responder comandos.</p>
+              <p className="text-xs text-[#6B6B65] mb-2">Registrá el webhook para que tu bot pueda recibir mensajes.</p>
               <div className="flex items-center gap-3">
                 <button
                   type="button"
@@ -260,7 +381,7 @@ export default function NotificacionesPage() {
               </div>
             </div>
 
-            {/* Test button */}
+            {/* Test */}
             <div className="flex items-center gap-3 pt-1">
               <button
                 type="button"
@@ -268,25 +389,12 @@ export default function NotificacionesPage() {
                 disabled={testing || !config.telegramBotToken || !config.telegramChatId}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-[8px] text-xs font-medium border border-[rgba(0,0,0,0.12)] text-[#6B6B65] hover:bg-[#F0EFE9] transition-colors disabled:opacity-50"
               >
-                {testing ? (
-                  <Loader2 size={13} className="animate-spin" />
-                ) : (
-                  <SendIcon size={13} />
-                )}
+                {testing ? <Loader2 size={13} className="animate-spin" /> : <SendIcon size={13} />}
                 Enviar mensaje de prueba
               </button>
-
               {testResult && (
-                <div
-                  className={`flex items-center gap-1.5 text-xs ${
-                    testResult.success ? "text-[#3B6D11]" : "text-[#A32D2D]"
-                  }`}
-                >
-                  {testResult.success ? (
-                    <CheckCircle size={13} />
-                  ) : (
-                    <XCircle size={13} />
-                  )}
+                <div className={`flex items-center gap-1.5 text-xs ${testResult.success ? "text-[#3B6D11]" : "text-[#A32D2D]"}`}>
+                  {testResult.success ? <CheckCircle size={13} /> : <XCircle size={13} />}
                   {testResult.message}
                 </div>
               )}
@@ -294,48 +402,27 @@ export default function NotificacionesPage() {
           </div>
         </div>
 
-        {/* Notification toggles */}
+        {/* Notification schedules */}
         <div className="bg-white rounded-[10px] border border-[rgba(0,0,0,0.08)] p-4">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-1">
             <Bell size={16} className="text-[#6B6B65]" />
-            <p className="text-sm font-medium text-[#1A1A18]">
-              Tipos de notificaciones
-            </p>
+            <p className="text-sm font-medium text-[#1A1A18]">Tipos de notificaciones</p>
           </div>
+          <p className="text-xs text-[#A0A09A] mb-4">Tocá el ▾ para cambiar horario y días de cada notificación</p>
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             {NOTIFICATION_TYPES.map((notif) => (
-              <div
+              <NotifCard
                 key={notif.key}
-                className="flex items-center justify-between py-2 border-b border-[rgba(0,0,0,0.05)] last:border-0"
-              >
-                <div className="flex-1 pr-4">
-                  <p className="text-sm font-medium text-[#1A1A18]">
-                    {notif.label}
-                  </p>
-                  <p className="text-xs text-[#A0A09A]">{notif.desc}</p>
-                  <p className="text-xs text-[#6B6B65] mt-0.5">{notif.time}</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={config[notif.key as keyof NotifConfig] as boolean}
-                    onChange={(e) =>
-                      setConfig((p) => ({
-                        ...p,
-                        [notif.key]: e.target.checked,
-                      }))
-                    }
-                  />
-                  <div className="w-9 h-5 bg-[#E0DFD9] peer-checked:bg-[#1A1A18] rounded-full transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-transform peer-checked:after:translate-x-4" />
-                </label>
-              </div>
+                notif={notif}
+                schedule={config[notif.key] as NotifSchedule}
+                onChange={(s) => setConfig(p => ({ ...p, [notif.key]: s }))}
+              />
             ))}
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex items-center gap-3">
           <button
             type="submit"
             disabled={saving}
@@ -344,78 +431,27 @@ export default function NotificacionesPage() {
             {saving && <Loader2 size={14} className="animate-spin" />}
             Guardar cambios
           </button>
+          {saved && <span className="text-xs text-[#3B6D11]">¡Guardado!</span>}
         </div>
       </form>
 
-      {/* Message templates preview */}
-      <div className="bg-white rounded-[10px] border border-[rgba(0,0,0,0.08)] p-4 mb-6">
-        <p className="text-sm font-medium text-[#1A1A18] mb-4">
-          Vista previa de mensajes
-        </p>
-        <div className="space-y-3">
-          {[
-            {
-              title: "Pre-entrenamiento",
-              msg: "💪 *¡Hola {nombre}!*\n\nHoy toca *{rutina}* a las {hora}.\n\n¡Dale con todo, che! Respondé \"listo\" cuando termines.",
-            },
-            {
-              title: "Recordatorio de peso",
-              msg: "⚖️ *Recordatorio de peso*\n\nAcordate de registrar tu peso antes de desayunar.\n\nRespondé con: *peso X.X*",
-            },
-            {
-              title: "Sesión perdida",
-              msg: "😅 *Che {nombre}...*\n\nNo completaste *{rutina}* de hoy. ¡No pasa nada! Un día no arruina tu progreso.",
-            },
-          ].map((tmpl) => (
-            <div
-              key={tmpl.title}
-              className="bg-[#F0EFE9] rounded-[8px] p-3"
-            >
-              <p className="text-xs font-medium text-[#6B6B65] mb-2">
-                {tmpl.title}
-              </p>
-              <p className="text-xs text-[#1A1A18] whitespace-pre-line leading-relaxed">
-                {tmpl.msg}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* History */}
       <div className="bg-white rounded-[10px] border border-[rgba(0,0,0,0.08)] p-4">
-        <p className="text-sm font-medium text-[#1A1A18] mb-4">
-          Historial de mensajes
-        </p>
+        <p className="text-sm font-medium text-[#1A1A18] mb-4">Historial de mensajes</p>
         {history.length === 0 ? (
-          <p className="text-sm text-[#A0A09A]">
-            Todavía no se enviaron notificaciones.
-          </p>
+          <p className="text-sm text-[#A0A09A]">Todavía no se enviaron notificaciones.</p>
         ) : (
           <div className="space-y-0">
             {history.slice(0, 20).map((log) => (
-              <div
-                key={log.id}
-                className="flex items-start justify-between py-2.5 border-b border-[rgba(0,0,0,0.05)] last:border-0"
-              >
-                <div className="flex-1 pr-4">
+              <div key={log.id} className="flex items-center justify-between py-2.5 border-b border-[rgba(0,0,0,0.05)] last:border-0">
+                <div>
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-xs font-medium text-[#1A1A18]">
-                      {typeLabels[log.type] || log.type}
-                    </span>
-                    <span
-                      className={`text-xs px-1.5 py-0.5 rounded-[4px] ${
-                        log.status === "sent"
-                          ? "bg-[#EAF3DE] text-[#3B6D11]"
-                          : "bg-[#FCEBEB] text-[#A32D2D]"
-                      }`}
-                    >
+                    <span className="text-xs font-medium text-[#1A1A18]">{typeLabels[log.type] || log.type}</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-[4px] ${log.status === "sent" ? "bg-[#EAF3DE] text-[#3B6D11]" : "bg-[#FCEBEB] text-[#A32D2D]"}`}>
                       {log.status === "sent" ? "Enviado" : "Error"}
                     </span>
                   </div>
-                  <p className="text-xs text-[#A0A09A]">
-                    {formatTime(log.sentAt)}
-                  </p>
+                  <p className="text-xs text-[#A0A09A]">{formatTime(log.sentAt)}</p>
                 </div>
               </div>
             ))}
