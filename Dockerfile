@@ -1,6 +1,6 @@
 FROM node:20-slim
 
-RUN apt-get update -y && apt-get install -y openssl
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -13,6 +13,6 @@ COPY . .
 
 RUN npm run build
 
-EXPOSE $PORT
+EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push && npm start"]
+CMD ["sh", "-c", "npx prisma db push && npx next start -H 0.0.0.0 -p 3000"]
