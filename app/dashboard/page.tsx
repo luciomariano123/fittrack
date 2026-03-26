@@ -85,7 +85,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/dashboard")
+    fetch(`/api/dashboard?start=${new Date(new Date().setHours(0,0,0,0)).toISOString()}&end=${new Date(new Date().setHours(23,59,59,999)).toISOString()}`)
       .then((r) => r.json())
       .then((d) => {
         setData(d);

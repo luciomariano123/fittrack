@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -11,6 +11,11 @@ export async function GET() {
     }
 
     const userId = parseInt(session.user.id);
+
+    const startParam = req.nextUrl.searchParams.get("start");
+    const endParam = req.nextUrl.searchParams.get("end");
+    const todayStart = startParam ? new Date(startParam) : (() => { const d = new Date(); d.setUTCHours(0,0,0,0); return d; })();
+    const todayEnd = endParam ? new Date(endParam) : (() => { const d = new Date(); d.setUTCHours(23,59,59,999); return d; })();
 
     const [user, weightLogs, sessions, todayFoodLogs] = await Promise.all([
       prisma.user.findUnique({
@@ -37,10 +42,7 @@ export async function GET() {
       prisma.foodLog.findMany({
         where: {
           userId,
-          loggedAt: {
-            gte: new Date(new Date().setHours(0, 0, 0, 0)),
-            lt: new Date(new Date().setHours(23, 59, 59, 999)),
-          },
+          loggedAt: { gte: todayStart, lte: todayEnd },
         },
       }),
     ]);

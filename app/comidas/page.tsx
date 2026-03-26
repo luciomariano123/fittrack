@@ -61,9 +61,11 @@ export default function ComidasPage() {
   const [mealPortion, setMealPortion] = useState<Record<string, string>>({});
 
   async function loadData() {
+    const start = new Date(new Date().setHours(0,0,0,0)).toISOString();
+    const end = new Date(new Date().setHours(23,59,59,999)).toISOString();
     const [foodRes, dashRes] = await Promise.all([
-      fetch("/api/food"),
-      fetch("/api/dashboard"),
+      fetch(`/api/food?start=${start}&end=${end}`),
+      fetch(`/api/dashboard?start=${start}&end=${end}`),
     ]);
     const foodData = await foodRes.json();
     const dashData = await dashRes.json();

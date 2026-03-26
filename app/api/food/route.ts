@@ -14,7 +14,7 @@ const foodLogSchema = z.object({
   fat: z.number().nonnegative(),
 });
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -22,10 +22,11 @@ export async function GET() {
     }
 
     const userId = parseInt(session.user.id);
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
+    const startParam = req.nextUrl.searchParams.get("start");
+    const endParam = req.nextUrl.searchParams.get("end");
+    // Client sends UTC boundaries for the local day
+    const todayStart = startParam ? new Date(startParam) : (() => { const d = new Date(); d.setUTCHours(0,0,0,0); return d; })();
+    const todayEnd = endParam ? new Date(endParam) : (() => { const d = new Date(); d.setUTCHours(23,59,59,999); return d; })();
 
     const foodLogs = await prisma.foodLog.findMany({
       where: {
