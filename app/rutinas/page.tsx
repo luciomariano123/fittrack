@@ -12,6 +12,8 @@ import {
   X,
   Download,
   FileText,
+  Pencil,
+  Check,
 } from "lucide-react";
 import { getDayName } from "@/lib/utils";
 
@@ -179,6 +181,9 @@ export default function RutinasPage() {
   }
 
   const [loadingDefault, setLoadingDefault] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", sets: "", reps: "", muscleGroup: "", weightKg: "" });
+  const [editSaving, setEditSaving] = useState(false);
 
   async function handleLoadDefault() {
     const hasExercises = exercises.length > 0;
@@ -256,6 +261,41 @@ export default function RutinasPage() {
     win.document.close();
     win.focus();
     setTimeout(() => { win.print(); }, 300);
+  }
+
+  function startEdit(ex: Exercise) {
+    setEditingId(ex.id);
+    setEditForm({
+      name: ex.name,
+      sets: String(ex.sets),
+      reps: ex.reps,
+      muscleGroup: ex.muscleGroup,
+      weightKg: ex.weightKg ? String(ex.weightKg) : "",
+    });
+  }
+
+  async function handleSaveEdit(id: number) {
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/exercises/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editForm.name,
+          sets: parseInt(editForm.sets),
+          reps: editForm.reps,
+          muscleGroup: editForm.muscleGroup,
+          weightKg: editForm.weightKg ? parseFloat(editForm.weightKg) : null,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setExercises(prev => prev.map(e => e.id === id ? data.exercise : e));
+        setEditingId(null);
+      }
+    } finally {
+      setEditSaving(false);
+    }
   }
 
   async function handleDeleteExercise(id: number) {
@@ -500,32 +540,97 @@ export default function RutinasPage() {
                     {dayExercises
                       .sort((a, b) => a.order - b.order)
                       .map((ex) => (
-                        <div
-                          key={ex.id}
-                          className="flex items-center justify-between py-1.5"
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="w-5 h-5 rounded-full bg-[#F0EFE9] flex items-center justify-center mt-0.5 shrink-0">
-                              <span className="text-[10px] font-medium text-[#6B6B65]">
-                                {ex.muscleGroup.slice(0, 2).toUpperCase()}
-                              </span>
+                        <div key={ex.id}>
+                          {editingId === ex.id ? (
+                            /* Inline edit form */
+                            <div className="bg-[#F0EFE9] rounded-[8px] p-3 space-y-2">
+                              <input
+                                value={editForm.name}
+                                onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                                placeholder="Nombre"
+                                className="w-full h-8 rounded-[6px] border border-[rgba(0,0,0,0.12)] bg-white px-2.5 text-sm focus:outline-none focus:border-[#1A1A18]"
+                              />
+                              <div className="flex gap-2">
+                                <input
+                                  type="number"
+                                  value={editForm.sets}
+                                  onChange={e => setEditForm(p => ({ ...p, sets: e.target.value }))}
+                                  placeholder="Series"
+                                  min={1}
+                                  className="w-16 h-8 rounded-[6px] border border-[rgba(0,0,0,0.12)] bg-white px-2.5 text-sm focus:outline-none focus:border-[#1A1A18]"
+                                />
+                                <span className="text-sm text-[#A0A09A] self-center">×</span>
+                                <input
+                                  value={editForm.reps}
+                                  onChange={e => setEditForm(p => ({ ...p, reps: e.target.value }))}
+                                  placeholder="Reps"
+                                  className="w-20 h-8 rounded-[6px] border border-[rgba(0,0,0,0.12)] bg-white px-2.5 text-sm focus:outline-none focus:border-[#1A1A18]"
+                                />
+                                <input
+                                  value={editForm.muscleGroup}
+                                  onChange={e => setEditForm(p => ({ ...p, muscleGroup: e.target.value }))}
+                                  placeholder="Músculo"
+                                  className="flex-1 h-8 rounded-[6px] border border-[rgba(0,0,0,0.12)] bg-white px-2.5 text-sm focus:outline-none focus:border-[#1A1A18]"
+                                />
+                                <input
+                                  type="number"
+                                  step="0.5"
+                                  value={editForm.weightKg}
+                                  onChange={e => setEditForm(p => ({ ...p, weightKg: e.target.value }))}
+                                  placeholder="kg"
+                                  className="w-16 h-8 rounded-[6px] border border-[rgba(0,0,0,0.12)] bg-white px-2.5 text-sm focus:outline-none focus:border-[#1A1A18]"
+                                />
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleSaveEdit(ex.id)}
+                                  disabled={editSaving}
+                                  className="flex items-center gap-1 px-3 py-1.5 rounded-[6px] text-xs font-medium bg-[#1A1A18] text-white disabled:opacity-50"
+                                >
+                                  {editSaving ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+                                  Guardar
+                                </button>
+                                <button
+                                  onClick={() => setEditingId(null)}
+                                  className="px-3 py-1.5 rounded-[6px] text-xs font-medium text-[#6B6B65] hover:bg-white transition-colors"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-sm font-medium text-[#1A1A18]">
-                                {ex.name}
-                              </p>
-                              <p className="text-xs text-[#A0A09A]">
-                                {ex.sets} series × {ex.reps}
-                                {ex.weightKg ? ` — ${ex.weightKg} kg` : ""}
-                              </p>
+                          ) : (
+                            /* Normal view */
+                            <div className="flex items-center justify-between py-1.5">
+                              <div className="flex items-start gap-3">
+                                <div className="w-5 h-5 rounded-full bg-[#F0EFE9] flex items-center justify-center mt-0.5 shrink-0">
+                                  <span className="text-[10px] font-medium text-[#6B6B65]">
+                                    {ex.muscleGroup.slice(0, 2).toUpperCase()}
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-[#1A1A18]">{ex.name}</p>
+                                  <p className="text-xs text-[#A0A09A]">
+                                    {ex.sets} series × {ex.reps}
+                                    {ex.weightKg ? ` — ${ex.weightKg} kg` : ""}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-0.5">
+                                <button
+                                  onClick={() => startEdit(ex)}
+                                  className="p-1.5 rounded-[6px] hover:bg-[#F0EFE9] text-[#A0A09A] hover:text-[#1A1A18] transition-colors"
+                                >
+                                  <Pencil size={13} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteExercise(ex.id)}
+                                  className="p-1.5 rounded-[6px] hover:bg-[#FCEBEB] text-[#A0A09A] hover:text-[#A32D2D] transition-colors"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                          <button
-                            onClick={() => handleDeleteExercise(ex.id)}
-                            className="p-1.5 rounded-[6px] hover:bg-[#FCEBEB] text-[#A0A09A] hover:text-[#A32D2D] transition-colors"
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                          )}
                         </div>
                       ))}
                   </div>
