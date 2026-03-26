@@ -16,7 +16,7 @@ const updateSchema = z.object({
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -24,8 +24,9 @@ export async function PUT(
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
 
+    const { id } = await params;
     const userId = parseInt(session.user.id);
-    const exerciseId = parseInt(params.id);
+    const exerciseId = parseInt(id);
 
     const existing = await prisma.exercise.findFirst({
       where: { id: exerciseId, userId },
@@ -56,7 +57,7 @@ export async function PUT(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -64,8 +65,9 @@ export async function DELETE(
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
 
+    const { id } = await params;
     const userId = parseInt(session.user.id);
-    const exerciseId = parseInt(params.id);
+    const exerciseId = parseInt(id);
 
     const existing = await prisma.exercise.findFirst({
       where: { id: exerciseId, userId },

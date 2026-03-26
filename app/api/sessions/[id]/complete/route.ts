@@ -7,7 +7,7 @@ import { postWorkoutMessage } from "@/lib/message-templates";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -15,8 +15,9 @@ export async function POST(
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
 
+    const { id } = await params;
     const userId = parseInt(session.user.id);
-    const sessionId = parseInt(params.id);
+    const sessionId = parseInt(id);
 
     const trainingSession = await prisma.trainingSession.findFirst({
       where: { id: sessionId, userId },
@@ -33,7 +34,6 @@ export async function POST(
       data: { completed: true, completedAt },
     });
 
-    // Send WhatsApp post-workout message if configured
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {

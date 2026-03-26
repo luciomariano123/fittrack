@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -13,8 +13,9 @@ export async function DELETE(
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
 
+    const { id } = await params;
     const userId = parseInt(session.user.id);
-    const logId = parseInt(params.id);
+    const logId = parseInt(id);
 
     const log = await prisma.foodLog.findFirst({
       where: { id: logId, userId },
