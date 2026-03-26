@@ -13,9 +13,41 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
-import { Plus, Loader2, TrendingDown, TrendingUp } from "lucide-react";
+import { Plus, Loader2, TrendingDown, TrendingUp, Flag, CheckCircle2 } from "lucide-react";
 import { formatDateShort } from "@/lib/utils";
-import { projectWeightData } from "@/lib/calculations";
+import { projectWeightData, linearRegression } from "@/lib/calculations";
+
+function calcDaysToGoal(logs: WeightLog[], goalKg: number): number | null {
+  if (logs.length < 2) return null;
+  const sorted = [...logs].sort((a, b) => new Date(a.loggedAt).getTime() - new Date(b.loggedAt).getTime());
+  const last14 = sorted.slice(-14);
+  const startTime = new Date(last14[0].loggedAt).getTime();
+  const points = last14.map(l => ({
+    x: (new Date(l.loggedAt).getTime() - startTime) / (1000 * 60 * 60 * 24),
+    y: l.weightKg,
+  }));
+  const { slope } = linearRegression(points);
+  if (slope >= 0) return null;
+  const current = sorted[sorted.length - 1].weightKg;
+  if (current <= goalKg) return 0;
+  return Math.round((goalKg - current) / slope);
+}
+
+function getMilestones(currentKg: number, goalKg: number): number[] {
+  const milestones: number[] = [];
+  const start = Math.floor(currentKg / 5) * 5;
+  for (let kg = start; kg > goalKg; kg -= 5) {
+    if (kg < currentKg) milestones.push(kg);
+  }
+  milestones.push(Math.round(goalKg * 10) / 10);
+  return milestones;
+}
+
+function formatETA(days: number) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toLocaleDateString("es-AR", { day: "numeric", month: "long" });
+}
 
 interface WeightLog {
   id: number;
@@ -177,6 +209,116 @@ function PesoPageInner() {
           <p className="text-xs text-[#A0A09A] mt-0.5">kg</p>
         </div>
       </div>
+
+      {/* Progress + ETA */}
+      {latestWeight && data?.weightGoalKg && latestWeight > data.weightGoalKg && (() => {
+        const goalKg = data.weightGoalKg;
+        const startKg = firstWeight || latestWeight;
+        const totalToLose = startKg - goalKg;
+        const lost = startKg - latestWeight;
+        const remaining = latestWeight - goalKg;
+        const pct = totalToLose > 0 ? Math.min(100, Math.round((lost / totalToLose) * 100)) : 0;
+        const trendDays = calcDaysToGoal(sortedLogs, goalKg);
+        const defaultDays = Math.round((remaining * 7700) / (500 * 7));
+        const days = trendDays ?? defaultDays;
+        const milestones = getMilestones(latestWeight, goalKg);
+
+        return (
+          <>
+            {/* Progress card */}
+            <div className="bg-white rounded-[10px] border border-[rgba(0,0,0,0.08)] p-4 mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Flag size={14} className="text-[#6B6B65]" />
+                  <p className="text-sm font-medium text-[#1A1A18]">Camino al objetivo</p>
+                </div>
+                <span className="text-xs font-mono font-medium text-[#185FA5]">{pct}% completado</span>
+              </div>
+
+              {/* Progress bar */}
+              <div className="h-2 bg-[#F0EFE9] rounded-full overflow-hidden mb-4">
+                <div
+                  className="h-full bg-[#3B6D11] rounded-full transition-all"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+
+              {/* Stats row */}
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div>
+                  <p className="text-xs text-[#6B6B65] mb-0.5">Perdido</p>
+                  <p className="text-base font-mono font-medium text-[#3B6D11]">{lost > 0 ? lost.toFixed(1) : "0"} kg</p>
+                </div>
+                <div>
+                  <p className="text-xs text-[#6B6B65] mb-0.5">Por perder</p>
+                  <p className="text-base font-mono font-medium text-[#1A1A18]">{remaining.toFixed(1)} kg</p>
+                </div>
+                <div>
+                  <p className="text-xs text-[#6B6B65] mb-0.5">Días restantes</p>
+                  <p className="text-base font-mono font-medium text-[#185FA5]">~{days}</p>
+                </div>
+              </div>
+
+              {/* ETA */}
+              <div className="mt-3 bg-[#F0EFE9] rounded-[8px] px-3 py-2 flex items-center justify-between">
+                <p className="text-xs text-[#6B6B65]">
+                  {trendDays ? "Según tu ritmo actual" : "Estimado a 0.5 kg/semana"}
+                </p>
+                <p className="text-xs font-medium text-[#1A1A18]">{formatETA(days)}</p>
+              </div>
+              {!trendDays && sortedLogs.length < 2 && (
+                <p className="text-[10px] text-[#A0A09A] mt-1.5">Registrá más pesajes para ver tu ritmo real</p>
+              )}
+            </div>
+
+            {/* Milestones */}
+            <div className="bg-white rounded-[10px] border border-[rgba(0,0,0,0.08)] p-4 mb-4">
+              <p className="text-sm font-medium text-[#1A1A18] mb-3">Hitos intermedios</p>
+              <div className="space-y-2">
+                {milestones.map((kg, i) => {
+                  const achieved = latestWeight <= kg;
+                  const isNext = !achieved && (i === 0 || latestWeight <= milestones[i - 1]);
+                  const isGoal = kg === Math.round(goalKg * 10) / 10;
+                  const daysToThis = calcDaysToGoal(sortedLogs, kg) ?? Math.round(((latestWeight - kg) * 7700) / (500 * 7));
+                  return (
+                    <div
+                      key={kg}
+                      className={`flex items-center justify-between rounded-[8px] px-3 py-2.5 ${
+                        achieved
+                          ? "bg-[#EAF3DE]"
+                          : isNext
+                          ? "bg-[#F0EFE9] border border-[rgba(0,0,0,0.10)]"
+                          : "bg-[#FAFAF8]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        {achieved ? (
+                          <CheckCircle2 size={15} className="text-[#3B6D11] shrink-0" />
+                        ) : (
+                          <div className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 ${isNext ? "border-[#1A1A18]" : "border-[#D0CFC9]"}`} />
+                        )}
+                        <div>
+                          <span className={`text-sm font-mono font-medium ${achieved ? "text-[#3B6D11]" : isNext ? "text-[#1A1A18]" : "text-[#A0A09A]"}`}>
+                            {kg} kg
+                          </span>
+                          {isGoal && <span className="ml-1.5 text-[10px] text-[#185FA5] font-medium">objetivo final</span>}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {achieved ? (
+                          <span className="text-xs text-[#3B6D11]">✓ Alcanzado</span>
+                        ) : (
+                          <span className="text-xs text-[#A0A09A] font-mono">~{daysToThis} días</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       {/* Chart */}
       <div className="bg-white rounded-[14px] border border-[rgba(0,0,0,0.08)] p-4 mb-6">
