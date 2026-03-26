@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              Int      @id @default(autoincrement())
+  name            String
+  email           String   @unique
+  passwordHash    String
+  birthDate       DateTime
+  sex             String
+  heightCm        Float
+  weightGoalKg    Float
+  activityLevel   String
+  trainDays       String
+  trainTime       String
+  whatsappNumber  String?
+  capsoApiKey     String?
+  onboardingDone  Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  weightLogs      WeightLog[]
+  sessions        TrainingSession[]
+  foodLogs        FoodLog[]
+  notifications   NotificationLog[]
+  exercises       Exercise[]
+}
+
+model WeightLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  weightKg  Float
+  loggedAt  DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Exercise {
+  id          Int    @id @default(autoincrement())
+  name        String
+  muscleGroup String
+  sets        Int
+  reps        String
+  weightKg    Float?
+  dayOfWeek   String
+  order       Int    @default(0)
+  userId      Int
+  user        User   @relation(fields: [userId], references: [id])
+}
+
+model TrainingSession {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  date        DateTime
+  routineName String
+  completed   Boolean  @default(false)
+  completedAt DateTime?
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model FoodLog {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  meal         String
+  foodName     String
+  grams        Float
+  kcal         Float
+  protein      Float
+  carbs        Float
+  fat          Float
+  loggedAt     DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id])
+}
+
+model NotificationLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  type      String
+  message   String?
+  sentAt    DateTime @default(now())
+  status    String
+  user      User     @relation(fields: [userId], references: [id])
+}
