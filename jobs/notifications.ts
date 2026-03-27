@@ -188,7 +188,7 @@ cron.schedule("* * * * *", async () => {
 
       const customNotifs: CustomNotif[] = cfg.customNotifications || [];
       for (const notif of customNotifs) {
-        if (notif.enabled && notif.time === currentTime && isTodayIncluded(notif, user.trainDays, todayName)) {
+        if (notif.enabled && notif.message?.trim() && notif.time === currentTime && isTodayIncluded(notif, user.trainDays, todayName)) {
           const result = await sendTelegramMessage(user.telegramChatId, notif.message, user.telegramBotToken);
           await logNotification(user.id, `custom_${notif.id}`, notif.message, result.ok ? "sent" : "error");
         }
