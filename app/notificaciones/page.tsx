@@ -620,8 +620,8 @@ export default function NotificacionesPage() {
                 <div>
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-xs font-medium text-[#1A1A18]">{getTypeLabel(log.type)}</span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded-[4px] ${log.status === "sent" ? "bg-[#EAF3DE] text-[#3B6D11]" : "bg-[#FCEBEB] text-[#A32D2D]"}`}>
-                      {log.status === "sent" ? "Enviado" : "Error"}
+                    <span className={`text-xs px-1.5 py-0.5 rounded-[4px] ${log.status === "sent" || log.status === "received" ? "bg-[#EAF3DE] text-[#3B6D11]" : "bg-[#FCEBEB] text-[#A32D2D]"}`}>
+                      {log.status === "sent" ? "Enviado" : log.status === "received" ? "Recibido" : "Error"}
                     </span>
                   </div>
                   <p className="text-xs text-[#A0A09A]">{formatTime(log.sentAt)}</p>
