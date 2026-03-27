@@ -54,7 +54,8 @@ Objetivo: *${vars.targetCalories} kcal* | *${vars.proteinTarget}g proteína*
 Consumido: *${vars.consumedCalories} kcal*
 ${remaining > 0 ? `Te quedan ${remaining} kcal por consumir.` : "¡Ya alcanzaste tu objetivo calórico!"}
 
-Abrí FitTrack para registrar tus comidas. 📱`;
+📝 Respondé con *comi \\[lo que comiste\\]* para registrar acá mismo\\.
+_Ej: comi almuerzo pollo con arroz_`;
 }
 
 export function weightReminderMessage(vars: WeightReminderVars): string {

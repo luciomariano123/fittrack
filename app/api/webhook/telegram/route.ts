@@ -128,6 +128,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // comi / /comi — log food
+    else if (
+      lowerText.startsWith('comi ') || lowerText.startsWith('/comi ') ||
+      lowerText.startsWith('desayuné ') || lowerText.startsWith('almorcé ') ||
+      lowerText.startsWith('cené ') || lowerText.startsWith('merendé ')
+    ) {
+      await handleComiCommand(user, chatId, botToken, text);
+    }
+
     // /listo or listo — complete today's session
     else if (lowerText === '/listo' || lowerText === 'listo' || lowerText === 'listo!' || lowerText === 'terminé') {
       await handleListoCommand(user, chatId, botToken);
@@ -145,7 +154,7 @@ export async function POST(req: NextRequest) {
 
     // Unknown command
     else {
-      const helpMessage = `🤖 *FitTrack Bot*\n\nComandos disponibles:\n• *peso X\\.X* — Registrar peso \\(ej: peso 78\\.5\\)\n• *listo* — Marcar sesión de hoy como completada\n• *estado* — Ver resumen de hoy\n• *rutina* — Ver ejercicios de hoy`;
+      const helpMessage = `🤖 *FitTrack Bot*\n\nComandos disponibles:\n• *comi \\[comida\\]* — Registrar lo que comiste \\(ej: comi cena pollo con arroz\\)\n• *peso X\\.X* — Registrar peso \\(ej: peso 78\\.5\\)\n• *listo* — Marcar sesión de hoy como completada\n• *estado* — Ver resumen de hoy\n• *rutina* — Ver ejercicios de hoy\n\n💡 También podés usar: *desayuné*, *almorcé*, *cené*, *merendé*`;
       await sendTelegramMessage(chatId, helpMessage, botToken);
     }
 
@@ -250,6 +259,117 @@ async function handleEstadoCommand(
   const statusMessage = `📊 *Resumen de hoy — ${user.name.split(' ')[0]}*\n\n⚖️ Peso: *${weightStr}*\n🔥 Calorías: *${consumedCalories} / ${targetCalories} kcal*\n💪 Entrenamiento: ${sessionStatus}`;
 
   await sendTelegramMessage(chatId, statusMessage, botToken);
+}
+
+async function handleComiCommand(
+  user: { id: number; name: string; timezone: string },
+  chatId: string,
+  botToken: string,
+  rawText: string
+) {
+  const MEAL_KEYWORDS: Record<string, string> = {
+    desayuno: 'Desayuno', almuerzo: 'Almuerzo', merienda: 'Merienda',
+    cena: 'Cena', snack: 'Snacks', snacks: 'Snacks',
+  };
+  const MEAL_CONJUGATIONS: Record<string, string> = {
+    'desayuné': 'Desayuno', 'almorcé': 'Almuerzo',
+    'cené': 'Cena', 'merendé': 'Merienda',
+  };
+  const PORTION_KEYWORDS: Record<string, string> = {
+    poco: 'poco', poca: 'poco', poquito: 'poco',
+    normal: 'normal',
+    bastante: 'bastante', mucho: 'bastante', mucha: 'bastante', harto: 'bastante',
+  };
+  const CALORIE_ESTIMATES: Record<string, Record<string, number>> = {
+    Desayuno: { poco: 150, normal: 300, bastante: 500 },
+    Almuerzo: { poco: 350, normal: 600, bastante: 900 },
+    Merienda: { poco: 80,  normal: 200, bastante: 350 },
+    Cena:     { poco: 300, normal: 550, bastante: 800 },
+    Snacks:   { poco: 80,  normal: 180, bastante: 300 },
+  };
+  const PROTEIN_ESTIMATES: Record<string, Record<string, number>> = {
+    Desayuno: { poco: 8,  normal: 15, bastante: 22 },
+    Almuerzo: { poco: 20, normal: 35, bastante: 50 },
+    Merienda: { poco: 3,  normal: 8,  bastante: 14 },
+    Cena:     { poco: 18, normal: 30, bastante: 45 },
+    Snacks:   { poco: 3,  normal: 7,  bastante: 12 },
+  };
+
+  const lowerText = rawText.toLowerCase().trim();
+  let meal: string | null = null;
+  let portion = 'normal';
+  let description = rawText.trim();
+
+  // Detect conjugated verbs (desayuné X, almorcé X, etc.)
+  for (const [conj, mealName] of Object.entries(MEAL_CONJUGATIONS)) {
+    if (lowerText.startsWith(conj + ' ')) {
+      meal = mealName;
+      description = rawText.slice(conj.length + 1).trim();
+      break;
+    }
+  }
+
+  if (!meal) {
+    // Remove "comi " or "/comi " prefix
+    const prefixLen = lowerText.startsWith('/comi ') ? 6 : 5;
+    description = rawText.slice(prefixLen).trim();
+
+    // Check if first word is a meal name
+    const firstWord = description.split(' ')[0].toLowerCase();
+    if (MEAL_KEYWORDS[firstWord]) {
+      meal = MEAL_KEYWORDS[firstWord];
+      description = description.slice(firstWord.length + 1).trim();
+    }
+  }
+
+  // Check if next word is a portion indicator
+  const firstDescWord = description.split(' ')[0].toLowerCase();
+  if (PORTION_KEYWORDS[firstDescWord]) {
+    portion = PORTION_KEYWORDS[firstDescWord];
+    description = description.slice(firstDescWord.length + 1).trim();
+  }
+
+  // Auto-detect meal from user's local hour if not specified
+  if (!meal) {
+    const tz = user.timezone || 'America/Argentina/Buenos_Aires';
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', hour12: false }).formatToParts(new Date());
+    const hour = parseInt(parts.find(p => p.type === 'hour')?.value ?? '12');
+    if (hour < 11) meal = 'Desayuno';
+    else if (hour < 15) meal = 'Almuerzo';
+    else if (hour < 19) meal = 'Merienda';
+    else if (hour < 23) meal = 'Cena';
+    else meal = 'Snacks';
+  }
+
+  if (!description) {
+    await sendTelegramMessage(chatId, `❌ Necesito saber qué comiste\\. Ej: *comi cena pollo con arroz*`, botToken);
+    return;
+  }
+
+  const kcal = CALORIE_ESTIMATES[meal]?.[portion] ?? 400;
+  const protein = PROTEIN_ESTIMATES[meal]?.[portion] ?? 20;
+  const carbs = Math.round(kcal * 0.45 / 4);
+  const fat = Math.round(kcal * 0.25 / 9);
+
+  await prisma.foodLog.create({
+    data: { userId: user.id, meal, foodName: description, grams: 0, kcal, protein, carbs, fat },
+  });
+
+  await prisma.notificationLog.create({
+    data: {
+      userId: user.id,
+      type: 'food_log_via_telegram',
+      message: `${meal}: ${description} (${kcal} kcal)`,
+      status: 'received',
+    },
+  });
+
+  const portionLabel = portion === 'poco' ? 'porción chica' : portion === 'bastante' ? 'porción grande' : 'porción normal';
+  await sendTelegramMessage(
+    chatId,
+    `✅ *${meal} registrado*\n\n📝 ${description}\n🔥 ~${kcal} kcal · 💪 ~${protein}g proteína\n_\\(${portionLabel} — estimado\\)_`,
+    botToken
+  );
 }
 
 async function handleRutinaCommand(
