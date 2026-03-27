@@ -2,9 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
-import { Bell, Send, Loader2, Send as SendIcon, CheckCircle, XCircle, Clock, ChevronDown, ChevronUp } from "lucide-react";
+import { Bell, Send, Loader2, Send as SendIcon, CheckCircle, XCircle, Clock, ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 
 interface NotifSchedule {
+  enabled: boolean;
+  time: string;
+  mode: "train" | "all" | "custom";
+  customDays: string[];
+}
+
+interface CustomNotif {
+  id: string;
+  label: string;
+  message: string;
   enabled: boolean;
   time: string;
   mode: "train" | "all" | "custom";
@@ -18,6 +28,7 @@ interface NotifConfig {
   nutritionReminder: NotifSchedule;
   weightReminder: NotifSchedule;
   missedSession: NotifSchedule;
+  customNotifications: CustomNotif[];
 }
 
 interface NotifLog {
@@ -67,10 +78,11 @@ const NOTIFICATION_TYPES = [
 const DEFAULT_CONFIG: NotifConfig = {
   telegramBotToken: "",
   telegramChatId: "",
-  preWorkout:        { enabled: true, time: "06:30", mode: "train",  customDays: [] },
-  nutritionReminder: { enabled: true, time: "13:00", mode: "all",    customDays: [] },
-  weightReminder:    { enabled: true, time: "08:00", mode: "all",    customDays: [] },
-  missedSession:     { enabled: true, time: "20:00", mode: "train",  customDays: [] },
+  preWorkout:           { enabled: true, time: "06:30", mode: "train", customDays: [] },
+  nutritionReminder:    { enabled: true, time: "13:00", mode: "all",   customDays: [] },
+  weightReminder:       { enabled: true, time: "08:00", mode: "all",   customDays: [] },
+  missedSession:        { enabled: true, time: "20:00", mode: "train", customDays: [] },
+  customNotifications:  [],
 };
 
 function modeLabel(mode: string) {
@@ -187,6 +199,102 @@ function NotifCard({ notif, schedule, onChange }: {
   );
 }
 
+function CustomNotifCard({ notif, onChange, onDelete }: {
+  notif: CustomNotif;
+  onChange: (n: CustomNotif) => void;
+  onDelete: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  function toggleDay(day: string) {
+    const days = notif.customDays.includes(day)
+      ? notif.customDays.filter(d => d !== day)
+      : [...notif.customDays, day];
+    onChange({ ...notif, customDays: days });
+  }
+
+  return (
+    <div className="border border-[rgba(0,0,0,0.08)] rounded-[10px] overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 bg-white">
+        <div className="flex-1 pr-3">
+          <p className="text-sm font-medium text-[#1A1A18]">{notif.label || "Sin nombre"}</p>
+          <p className="text-xs text-[#A0A09A] truncate max-w-[200px]">{notif.message || "Sin mensaje"}</p>
+          <p className="text-xs text-[#6B6B65] mt-0.5">
+            <Clock size={10} className="inline mr-0.5 mb-px" />
+            {notif.time} · {modeLabel(notif.mode)}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => setExpanded(e => !e)} className="text-[#A0A09A] hover:text-[#1A1A18] transition-colors">
+            {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+          </button>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" className="sr-only peer" checked={notif.enabled} onChange={e => onChange({ ...notif, enabled: e.target.checked })} />
+            <div className="w-9 h-5 bg-[#E0DFD9] peer-checked:bg-[#1A1A18] rounded-full transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-transform peer-checked:after:translate-x-4" />
+          </label>
+          <button type="button" onClick={onDelete} className="text-[#A0A09A] hover:text-[#A32D2D] transition-colors ml-1">
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </div>
+      {expanded && (
+        <div className="border-t border-[rgba(0,0,0,0.06)] bg-[#FAFAF8] px-4 py-3 space-y-3">
+          <div>
+            <label className="text-xs font-medium text-[#6B6B65] block mb-1.5">Nombre</label>
+            <input
+              type="text"
+              value={notif.label}
+              onChange={e => onChange({ ...notif, label: e.target.value })}
+              placeholder="Ej: Recordatorio de cena"
+              className="w-full h-9 rounded-[8px] border border-[rgba(0,0,0,0.12)] bg-white px-3 text-sm focus:outline-none focus:border-[#1A1A18]"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-[#6B6B65] block mb-1.5">Mensaje</label>
+            <textarea
+              value={notif.message}
+              onChange={e => onChange({ ...notif, message: e.target.value })}
+              placeholder="Ej: ¡Hora de cenar! No te olvides de registrar tus comidas."
+              rows={2}
+              className="w-full rounded-[8px] border border-[rgba(0,0,0,0.12)] bg-white px-3 py-2 text-sm focus:outline-none focus:border-[#1A1A18] resize-none"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-[#6B6B65] block mb-1.5">Horario</label>
+            <input
+              type="time"
+              value={notif.time}
+              onChange={e => onChange({ ...notif, time: e.target.value })}
+              className="h-9 rounded-[8px] border border-[rgba(0,0,0,0.12)] bg-white px-3 text-sm focus:outline-none focus:border-[#1A1A18]"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-[#6B6B65] block mb-1.5">Días</label>
+            <div className="flex gap-1.5 flex-wrap">
+              {(["train", "all", "custom"] as const).map(mode => (
+                <button key={mode} type="button" onClick={() => onChange({ ...notif, mode })}
+                  className={`px-2.5 py-1 rounded-[6px] text-xs font-medium border transition-colors ${notif.mode === mode ? "bg-[#1A1A18] text-white border-[#1A1A18]" : "bg-white text-[#6B6B65] border-[rgba(0,0,0,0.12)] hover:bg-[#F0EFE9]"}`}>
+                  {mode === "train" ? "Días de entreno" : mode === "all" ? "Todos los días" : "Personalizado"}
+                </button>
+              ))}
+            </div>
+            {notif.mode === "custom" && (
+              <div className="flex gap-1.5 mt-2">
+                {DAYS.map((day, i) => (
+                  <button key={day} type="button" onClick={() => toggleDay(day)}
+                    className={`w-7 h-7 rounded-full text-xs font-medium border transition-colors ${notif.customDays.includes(day) ? "bg-[#1A1A18] text-white border-[#1A1A18]" : "bg-white text-[#6B6B65] border-[rgba(0,0,0,0.12)] hover:bg-[#F0EFE9]"}`}>
+                    {DAYS_SHORT[i]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function NotificacionesPage() {
   const [config, setConfig] = useState<NotifConfig>(DEFAULT_CONFIG);
   const [history, setHistory] = useState<NotifLog[]>([]);
@@ -207,16 +315,38 @@ export default function NotificacionesPage() {
         setConfig({
           ...DEFAULT_CONFIG,
           ...cfg.config,
-          preWorkout:        { ...DEFAULT_CONFIG.preWorkout,        ...cfg.config.preWorkout },
-          nutritionReminder: { ...DEFAULT_CONFIG.nutritionReminder, ...cfg.config.nutritionReminder },
-          weightReminder:    { ...DEFAULT_CONFIG.weightReminder,    ...cfg.config.weightReminder },
-          missedSession:     { ...DEFAULT_CONFIG.missedSession,     ...cfg.config.missedSession },
+          preWorkout:           { ...DEFAULT_CONFIG.preWorkout,        ...cfg.config.preWorkout },
+          nutritionReminder:    { ...DEFAULT_CONFIG.nutritionReminder, ...cfg.config.nutritionReminder },
+          weightReminder:       { ...DEFAULT_CONFIG.weightReminder,    ...cfg.config.weightReminder },
+          missedSession:        { ...DEFAULT_CONFIG.missedSession,     ...cfg.config.missedSession },
+          customNotifications:  Array.isArray(cfg.config.customNotifications) ? cfg.config.customNotifications : [],
         });
       }
       setHistory(hist.notifications || []);
       setLoading(false);
     });
   }, []);
+
+  function addCustomNotif() {
+    const newNotif: CustomNotif = {
+      id: Date.now().toString(),
+      label: "",
+      message: "",
+      enabled: true,
+      time: "20:00",
+      mode: "all",
+      customDays: [],
+    };
+    setConfig(p => ({ ...p, customNotifications: [...p.customNotifications, newNotif] }));
+  }
+
+  function updateCustomNotif(id: string, updated: CustomNotif) {
+    setConfig(p => ({ ...p, customNotifications: p.customNotifications.map(n => n.id === id ? updated : n) }));
+  }
+
+  function deleteCustomNotif(id: string) {
+    setConfig(p => ({ ...p, customNotifications: p.customNotifications.filter(n => n.id !== id) }));
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -283,13 +413,22 @@ export default function NotificacionesPage() {
     });
   }
 
-  const typeLabels: Record<string, string> = {
-    pre_workout: "Pre-entrenamiento",
-    nutrition_reminder: "Nutricional",
-    weight_reminder: "Peso",
-    missed_session: "Sesión perdida",
-    test: "Prueba",
-  };
+  function getTypeLabel(type: string): string {
+    const fixed: Record<string, string> = {
+      pre_workout: "Pre-entrenamiento",
+      nutrition_reminder: "Nutricional",
+      weight_reminder: "Peso",
+      missed_session: "Sesión perdida",
+      test: "Prueba",
+    };
+    if (fixed[type]) return fixed[type];
+    if (type.startsWith("custom_")) {
+      const id = type.replace("custom_", "");
+      const found = config.customNotifications.find(n => n.id === id);
+      return found?.label || "Personalizado";
+    }
+    return type;
+  }
 
   const isConnected = !!(config.telegramBotToken && config.telegramChatId);
 
@@ -422,6 +561,40 @@ export default function NotificacionesPage() {
           </div>
         </div>
 
+        {/* Custom notifications */}
+        <div className="bg-white rounded-[10px] border border-[rgba(0,0,0,0.08)] p-4">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <Bell size={16} className="text-[#6B6B65]" />
+              <p className="text-sm font-medium text-[#1A1A18]">Recordatorios personalizados</p>
+            </div>
+            <button
+              type="button"
+              onClick={addCustomNotif}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-[8px] text-xs font-medium bg-[#1A1A18] text-white hover:bg-[#1A1A18]/85 transition-colors"
+            >
+              <Plus size={12} />
+              Agregar
+            </button>
+          </div>
+          <p className="text-xs text-[#A0A09A] mb-4">Creá tus propios recordatorios con el mensaje que quieras</p>
+
+          {config.customNotifications.length === 0 ? (
+            <p className="text-xs text-[#A0A09A] text-center py-3">No hay recordatorios personalizados. Tocá "Agregar" para crear uno.</p>
+          ) : (
+            <div className="space-y-2">
+              {config.customNotifications.map(notif => (
+                <CustomNotifCard
+                  key={notif.id}
+                  notif={notif}
+                  onChange={(n) => updateCustomNotif(notif.id, n)}
+                  onDelete={() => deleteCustomNotif(notif.id)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="flex items-center gap-3">
           <button
             type="submit"
@@ -446,7 +619,7 @@ export default function NotificacionesPage() {
               <div key={log.id} className="flex items-center justify-between py-2.5 border-b border-[rgba(0,0,0,0.05)] last:border-0">
                 <div>
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-xs font-medium text-[#1A1A18]">{typeLabels[log.type] || log.type}</span>
+                    <span className="text-xs font-medium text-[#1A1A18]">{getTypeLabel(log.type)}</span>
                     <span className={`text-xs px-1.5 py-0.5 rounded-[4px] ${log.status === "sent" ? "bg-[#EAF3DE] text-[#3B6D11]" : "bg-[#FCEBEB] text-[#A32D2D]"}`}>
                       {log.status === "sent" ? "Enviado" : "Error"}
                     </span>

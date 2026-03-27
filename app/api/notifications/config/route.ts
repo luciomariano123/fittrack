@@ -10,11 +10,22 @@ export interface NotifSchedule {
   customDays: string[]; // used when mode="custom"
 }
 
+export interface CustomNotif {
+  id: string;
+  label: string;
+  message: string;
+  enabled: boolean;
+  time: string;
+  mode: "train" | "all" | "custom";
+  customDays: string[];
+}
+
 export interface NotificationConfig {
   preWorkout: NotifSchedule;
   nutritionReminder: NotifSchedule;
   weightReminder: NotifSchedule;
   missedSession: NotifSchedule;
+  customNotifications?: CustomNotif[];
 }
 
 export const DEFAULT_NOTIF_CONFIG: NotificationConfig = {
@@ -63,10 +74,11 @@ export async function PUT(req: NextRequest) {
     const userId = parseInt(session.user.id);
 
     const notifConfig: NotificationConfig = {
-      preWorkout:        body.preWorkout        || DEFAULT_NOTIF_CONFIG.preWorkout,
-      nutritionReminder: body.nutritionReminder || DEFAULT_NOTIF_CONFIG.nutritionReminder,
-      weightReminder:    body.weightReminder    || DEFAULT_NOTIF_CONFIG.weightReminder,
-      missedSession:     body.missedSession     || DEFAULT_NOTIF_CONFIG.missedSession,
+      preWorkout:           body.preWorkout        || DEFAULT_NOTIF_CONFIG.preWorkout,
+      nutritionReminder:    body.nutritionReminder || DEFAULT_NOTIF_CONFIG.nutritionReminder,
+      weightReminder:       body.weightReminder    || DEFAULT_NOTIF_CONFIG.weightReminder,
+      missedSession:        body.missedSession     || DEFAULT_NOTIF_CONFIG.missedSession,
+      customNotifications:  Array.isArray(body.customNotifications) ? body.customNotifications : [],
     };
 
     await prisma.user.update({

@@ -13,7 +13,7 @@ import {
   calculateTargetCalories,
   calculateAge,
 } from "@/lib/calculations";
-import type { NotifSchedule, NotificationConfig } from "@/app/api/notifications/config/route";
+import type { NotifSchedule, NotificationConfig, CustomNotif } from "@/app/api/notifications/config/route";
 
 const DAY_NAMES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
@@ -184,6 +184,14 @@ cron.schedule("* * * * *", async () => {
 
       if (missed.enabled && missed.time === currentTime && isTodayIncluded(missed, user.trainDays, todayName)) {
         await runMissedSession(user);
+      }
+
+      const customNotifs: CustomNotif[] = cfg.customNotifications || [];
+      for (const notif of customNotifs) {
+        if (notif.enabled && notif.time === currentTime && isTodayIncluded(notif, user.trainDays, todayName)) {
+          const result = await sendTelegramMessage(user.telegramChatId, notif.message, user.telegramBotToken);
+          await logNotification(user.id, `custom_${notif.id}`, notif.message, result.ok ? "sent" : "error");
+        }
       }
     }
   } catch (error) {
